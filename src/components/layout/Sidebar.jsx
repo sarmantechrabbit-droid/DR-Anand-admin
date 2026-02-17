@@ -12,8 +12,13 @@ import {
   HelpCircle,
   Inbox,
 } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
+  const { user } = useAuth();
+  const displayName = user?.name || "Admin";
+  const displaySubtext = user?.email || user?.role || "Admin";
+
   const menuItems = [
     { name: "Dashboard", icon: LayoutDashboard, path: "/" },
     // { name: "Patients", icon: Users, path: "/patients" },
@@ -23,7 +28,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
     { name: "Blogs", icon: BookOpen, path: "/blogs" },
     { name: "FAQs", icon: HelpCircle, path: "/faqs" },
     { name: "Inquiries", icon: Inbox, path: "/inquiries" },
-    { name: "Settings", icon: Settings, path: "/settings" },
+    // { name: "Settings", icon: Settings, path: "/settings" },
   ];
 
   return (
@@ -49,8 +54,8 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
               <Stethoscope className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-800">Dr. Anand</h1>
-              <p className="text-xs text-gray-500">Gastro Surgeon</p>
+              <h1 className="text-xl font-bold text-gray-800">{displayName}</h1>
+              <p className="text-xs text-gray-500">{displaySubtext}</p>
             </div>
           </div>
 

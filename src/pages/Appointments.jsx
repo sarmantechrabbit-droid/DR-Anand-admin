@@ -1,121 +1,123 @@
-import React, { useState } from 'react';
-import { Calendar, Clock, User, Plus, Filter, Mail, Phone } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import { Calendar, User, Trash2 } from 'lucide-react';
 import Card from '../components/ui/Card';
-import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
+import DeleteConfirmation from '../components/ui/DeleteConfirmation';
 import { motion } from 'framer-motion';
+import { API_URLS } from '../config/api';
+
+const API_URL = API_URLS.APPOINTMENTS;
 
 const Appointments = () => {
-  const [selectedDate, setSelectedDate] = useState('2024-02-13');
-  const [filterStatus, setFilterStatus] = useState('All');
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showDeletePopup, setShowDeletePopup] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
-  const [appointments, setAppointments] = useState([
-    {
-      id: 1,
-      patient: 'Rajesh Kumar',
-      date: '2024-02-13',
-      time: '09:00 AM',
-      type: 'Consultation',
-      status: 'Confirmed',
-      duration: '30 min',
-    },
-    {
-      id: 2,
-      patient: 'Priya Sharma',
-      date: '2024-02-13',
-      time: '10:30 AM',
-      type: 'Follow-up',
-      status: 'Confirmed',
-      duration: '20 min',
-    },
-    {
-      id: 3,
-      patient: 'Amit Patel',
-      date: '2024-02-13',
-      time: '11:00 AM',
-      type: 'Surgery',
-      status: 'Pending',
-      duration: '180 min',
-    },
-    {
-      id: 4,
-      patient: 'Sneha Reddy',
-      date: '2024-02-13',
-      time: '02:00 PM',
-      type: 'Consultation',
-      status: 'Confirmed',
-      duration: '30 min',
-    },
-    {
-      id: 5,
-      patient: 'Vikram Singh',
-      date: '2024-02-13',
-      time: '03:30 PM',
-      type: 'Follow-up',
-      status: 'Pending',
-      duration: '20 min',
-    },
-    {
-      id: 6,
-      patient: 'Kavita Desai',
-      date: '2024-02-13',
-      time: '04:00 PM',
-      type: 'Consultation',
-      status: 'Cancelled',
-      duration: '30 min',
-    },
-    {
-      id: 7,
-      patient: 'Arjun Mehta',
-      date: '2024-02-14',
-      time: '09:30 AM',
-      type: 'Surgery',
-      status: 'Confirmed',
-      duration: '240 min',
-    },
-    {
-      id: 8,
-      patient: 'Neha Gupta',
-      date: '2024-02-14',
-      time: '02:30 PM',
-      type: 'Consultation',
-      status: 'Pending',
-      duration: '30 min',
-    },
-  ]);
+  const [appointmentToDelete, setAppointmentToDelete] = useState(null);
+  const [appointments, setAppointments] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const handleDelete = (id) => {
-    setAppointments(appointments.filter(a => a.id !== id));
+  const normalizeAppointment = (item) => {
+    const firstName = item.firstName || item.first_name || item.patientFirstName || '';
+    const lastName = item.lastName || item.last_name || item.patientLastName || '';
+    const fullName = `${firstName} ${lastName}`.trim();
+
+    return {
+      id: item.id || item._id,
+      firstName: firstName || '-',
+      lastName: lastName || '-',
+      mobileNumber: item.mobileNumber || item.mobile || item.phone || '-',
+      typesOfTreatment:
+        item.typesOfTreatment ||
+        item.typeOfTreatment || 
+        item.treatmentType ||
+        item.appointmentType ||
+        '-',
+      city: item.city || '-',
+      patient: fullName || item.patientName || item.fullName || item.name || 'Unknown',
+    };
   };
 
-  const filteredAppointments = appointments.filter((appointment) => {
-    const statusMatch = filterStatus === 'All' || appointment.status === filterStatus;
-    return statusMatch;
-  });
+  const extractAppointmentsList = (payload) => {
+    if (Array.isArray(payload)) return { list: payload, hasArray: true };
+    if (Array.isArray(payload?.appointments)) return { list: payload.appointments, hasArray: true };
+    if (Array.isArray(payload?.appointment)) return { list: payload.appointment, hasArray: true };
+    if (Array.isArray(payload?.items)) return { list: payload.items, hasArray: true };
+    if (Array.isArray(payload?.results)) return { list: payload.results, hasArray: true };
+    if (Array.isArray(payload?.docs)) return { list: payload.docs, hasArray: true };
+    if (Array.isArray(payload?.data)) return { list: payload.data, hasArray: true };
+    if (Array.isArray(payload?.data?.appointments)) return { list: payload.data.appointments, hasArray: true };
+    if (Array.isArray(payload?.data?.items)) return { list: payload.data.items, hasArray: true };
+    if (Array.isArray(payload?.data?.results)) return { list: payload.data.results, hasArray: true };
+    if (Array.isArray(payload?.data?.docs)) return { list: payload.data.docs, hasArray: true };
+    return { list: [], hasArray: false };
+  };
+
+  const fetchAppointments = async () => {
+    setIsLoading(true);
+    setErrorMessage('');
+    try {
+      const { data } = await axios.get(API_URL);
+      const { list, hasArray } = extractAppointmentsList(data);
+      setAppointments(list.map(normalizeAppointment));
+      if (!hasArray) {
+        setErrorMessage('API connected, but no appointment array found in response.');
+      }
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || error.message || 'Unable to load appointments');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAppointments();
+  }, []);
+
+  const handleDeleteClick = (appointment) => {
+    setAppointmentToDelete(appointment);
+    setShowDeletePopup(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!appointmentToDelete?.id) return;
+    setErrorMessage('');
+    try {
+      await axios.delete(`${API_URL}/${appointmentToDelete.id}`);
+      setAppointments((prev) => prev.filter((item) => item.id !== appointmentToDelete.id));
+      if (selectedAppointment?.id === appointmentToDelete.id) {
+        setShowViewModal(false);
+        setSelectedAppointment(null);
+      }
+      setShowDeletePopup(false);
+      setAppointmentToDelete(null);
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || error.message || 'Unable to delete appointment');
+    }
+  };
+
+  const filteredAppointments = appointments;
+
+  const uniquePatients = new Set(
+    appointments.map((a) => `${a.firstName} ${a.lastName}`.trim().toLowerCase())
+  ).size;
+  const uniqueTreatments = new Set(
+    appointments.map((a) => (a.typesOfTreatment || '').toLowerCase()).filter(Boolean)
+  ).size;
+  const uniqueCities = new Set(
+    appointments.map((a) => (a.city || '').toLowerCase()).filter(Boolean)
+  ).size;
 
   const stats = [
     { label: 'Total Appointments', value: appointments.length, color: 'bg-primary-500' },
-    {
-      label: 'Confirmed',
-      value: appointments.filter((a) => a.status === 'Confirmed').length,
-      color: 'bg-green-600',
-    },
-    {
-      label: 'Pending',
-      value: appointments.filter((a) => a.status === 'Pending').length,
-      color: 'bg-yellow-600',
-    },
-    {
-      label: 'Cancelled',
-      value: appointments.filter((a) => a.status === 'Cancelled').length,
-      color: 'bg-red-600',
-    },
+    { label: 'Total Patients', value: uniquePatients, color: 'bg-green-600' },
+    { label: 'Treatments', value: uniqueTreatments, color: 'bg-yellow-600' },
+    { label: 'Cities', value: uniqueCities, color: 'bg-blue-600' },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -125,11 +127,9 @@ const Appointments = () => {
           <h1 className="text-2xl font-bold text-gray-800">Appointments</h1>
           <p className="text-gray-600 mt-1">Manage your appointment schedule</p>
         </div>
-        <Button icon={Plus} onClick={() => navigate('/appointments/add')}>New Appointment</Button>
       </motion.div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, index) => (
           <motion.div
             key={index}
@@ -147,39 +147,18 @@ const Appointments = () => {
         ))}
       </div>
 
-      {/* Filters */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="flex flex-col sm:flex-row gap-4"
-      >
-        <div className="flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-gray-400" />
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <Filter className="w-5 h-5 text-gray-400" />
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-          >
-            <option>All</option>
-            <option>Confirmed</option>
-            <option>Pending</option>
-            <option>Cancelled</option>
-          </select>
-        </div>
-      </motion.div>
-
-      {/* Appointments List */}
       <Card delay={0.5}>
+        {errorMessage && (
+          <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 border border-red-200">
+            {errorMessage}
+          </div>
+        )}
+        {isLoading && (
+          <div className="mb-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-700 border border-blue-200">
+            Loading appointments...
+          </div>
+        )}
+
         <div className="space-y-4">
           {filteredAppointments.map((appointment, index) => (
             <motion.div
@@ -195,24 +174,14 @@ const Appointments = () => {
                 </div>
                 <div>
                   <h4 className="font-semibold text-gray-800">{appointment.patient}</h4>
-                  <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-gray-600">
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
-                      <span>{appointment.date}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-4 h-4" />
-                      <span>{appointment.time}</span>
-                    </div>
-                    <span className="px-2 py-1 bg-gray-100 rounded text-xs">
-                      {appointment.type}
-                    </span>
-                    <span className="text-xs text-gray-500">{appointment.duration}</span>
+                  <div className="flex flex-wrap items-center gap-2 mt-2 text-sm text-gray-600">
+                    <span className="px-2 py-1 bg-gray-100 rounded text-xs">{appointment.typesOfTreatment}</span>
+                    <span className="text-xs">Mobile: {appointment.mobileNumber}</span>
+                    <span className="text-xs">City: {appointment.city}</span>
                   </div>
                 </div>
               </div>
               <div className="flex items-center gap-3 mt-4 sm:mt-0">
-                <Badge status={appointment.status} />
                 <Button
                   size="sm"
                   variant="outline"
@@ -223,23 +192,28 @@ const Appointments = () => {
                 >
                   Details
                 </Button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  icon={Trash2}
+                  onClick={() => handleDeleteClick(appointment)}
+                >
+                  Delete
+                </Button>
               </div>
             </motion.div>
           ))}
         </div>
 
-        {/* Empty State */}
-        {filteredAppointments.length === 0 && (
+        {!isLoading && filteredAppointments.length === 0 && (
           <div className="text-center py-12">
             <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-800 mb-2">No appointments found</h3>
-            <p className="text-gray-600 mb-4">Try adjusting your filters or create a new appointment</p>
-            <Button icon={Plus}>Schedule Appointment</Button>
+            <p className="text-gray-600 mb-4">Try adjusting your filters</p>
           </div>
         )}
       </Card>
 
-      {/* View Appointment Modal */}
       {showViewModal && selectedAppointment && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <motion.div
@@ -265,57 +239,51 @@ const Appointments = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-xl font-semibold text-gray-800">{selectedAppointment.patient}</h3>
-                  <p className="text-sm text-gray-600 mt-1">{selectedAppointment.type}</p>
+                  <p className="text-sm text-gray-600 mt-1">{selectedAppointment.typesOfTreatment}</p>
                 </div>
-                <Badge status={selectedAppointment.status}>{selectedAppointment.status}</Badge>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
-                  <Calendar className="w-5 h-5 text-gray-400" />
-                  <div>
-                    <p className="text-xs text-gray-500">Date</p>
-                    <p className="text-sm font-medium text-gray-800">{selectedAppointment.date}</p>
-                  </div>
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500">First Name</p>
+                  <p className="text-sm font-medium text-gray-800">{selectedAppointment.firstName}</p>
                 </div>
 
-                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
-                  <Clock className="w-5 h-5 text-gray-400" />
-                  <div>
-                    <p className="text-xs text-gray-500">Time</p>
-                    <p className="text-sm font-medium text-gray-800">{selectedAppointment.time}</p>
-                  </div>
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500">Last Name</p>
+                  <p className="text-sm font-medium text-gray-800">{selectedAppointment.lastName}</p>
                 </div>
 
-                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
-                  <User className="w-5 h-5 text-gray-400" />
-                  <div>
-                    <p className="text-xs text-gray-500">Type</p>
-                    <p className="text-sm font-medium text-gray-800">{selectedAppointment.type}</p>
-                  </div>
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500">Mobile Number</p>
+                  <p className="text-sm font-medium text-gray-800">{selectedAppointment.mobileNumber}</p>
                 </div>
 
-                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
-                  <Clock className="w-5 h-5 text-gray-400" />
-                  <div>
-                    <p className="text-xs text-gray-500">Duration</p>
-                    <p className="text-sm font-medium text-gray-800">{selectedAppointment.duration}</p>
-                  </div>
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500">Types of Treatment</p>
+                  <p className="text-sm font-medium text-gray-800">{selectedAppointment.typesOfTreatment}</p>
                 </div>
-              </div>
 
-              <div className="flex gap-3">
-                <Button variant="primary" className="flex-1">
-                  Confirm Appointment
-                </Button>
-                <Button variant="outline" onClick={() => setShowViewModal(false)}>
-                  Close
-                </Button>
+                <div className="p-4 bg-gray-50 rounded-lg md:col-span-2">
+                  <p className="text-xs text-gray-500">City</p>
+                  <p className="text-sm font-medium text-gray-800">{selectedAppointment.city}</p>
+                </div>
               </div>
             </div>
           </motion.div>
         </div>
       )}
+
+      <DeleteConfirmation
+        isOpen={showDeletePopup}
+        onClose={() => {
+          setShowDeletePopup(false);
+          setAppointmentToDelete(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Appointment"
+        message={`Are you sure you want to delete this appointment${appointmentToDelete?.patient ? ` for ${appointmentToDelete.patient}` : ''}? This action cannot be undone.`}
+      />
     </div>
   );
 };

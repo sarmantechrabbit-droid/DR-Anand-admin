@@ -14,6 +14,7 @@ import Blogs from './pages/Blogs';
 import FAQs from './pages/FAQs';
 import Inquiries from './pages/Inquiries';
 import ChangePassword from './pages/ChangePassword';
+import AddAppointment from './pages/AddAppointment';
 
 function App() {
   return (
@@ -31,12 +32,13 @@ function App() {
           >
             <Route index element={<Dashboard />} />
             <Route path="patients" element={<Patients />} />
-            {/* <Route path="appointments" element={<Appointments />} /> */}
-            {/* <Route path="reports" element={<Reports />} />
+            <Route path="appointments" element={<Appointments />} />
+            <Route path="appointments/add" element={<AddAppointment />} />
+              {/* <Route path="reports" element={<Reports />} /> */}
             <Route path="testimonials" element={<Testimonials />} />
-            <Route path="blogs" element={<Blogs />} />
+           <Route path="blogs" element={<Blogs />} />
             <Route path="faqs" element={<FAQs />} />
-            <Route path="inquiries" element={<Inquiries />} /> */}
+            <Route path="inquiries" element={<Inquiries />} />
             <Route path="settings" element={<Settings />} />
             <Route path="change-password" element={<ChangePassword />} />
           </Route>

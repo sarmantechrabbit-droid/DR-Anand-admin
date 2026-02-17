@@ -1,91 +1,110 @@
-import React, { useState } from 'react';
-import { Mail, Phone, Calendar, Eye, Trash2, MessageSquare, Filter, Clock, CheckCircle } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import { Mail, Phone, Calendar, Eye, Trash2, MessageSquare, Filter, Clock } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import SearchInput from '../components/ui/SearchInput';
+import DeleteConfirmation from '../components/ui/DeleteConfirmation';
 import { motion } from 'framer-motion';
+import { API_URLS } from '../config/api';
 
 const Inquiries = () => {
+  const API_URL = API_URLS.INQUIRIES;
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [selectedInquiry, setSelectedInquiry] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showReplyModal, setShowReplyModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [inquiryToDelete, setInquiryToDelete] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [replyError, setReplyError] = useState('');
+  const [replyForm, setReplyForm] = useState({
+    subject: '',
+    message: '',
+  });
 
-  const [inquiriesList, setInquiriesList] = useState([
-    {
-      id: 1,
-      name: 'Rahul Sharma',
-      email: 'rahul.sharma@email.com',
-      phone: '+91 98765 43210',
-      subject: 'Appointment Query',
-      message: 'I would like to book an appointment for a gastro consultation. What are your available slots for next week?',
-      date: '2024-02-13',
-      time: '10:30 AM',
-      status: 'New',
-    },
-    {
-      id: 2,
-      name: 'Priya Patel',
-      email: 'priya.p@email.com',
-      phone: '+91 98765 43211',
-      subject: 'Surgery Information',
-      message: 'Could you please provide information about laparoscopic surgery procedures and recovery time?',
-      date: '2024-02-13',
-      time: '09:15 AM',
-      status: 'In Progress',
-    },
-    {
-      id: 3,
-      name: 'Amit Kumar',
-      email: 'amit.k@email.com',
-      phone: '+91 98765 43212',
-      subject: 'Medical Reports',
-      message: 'I need to collect my medical reports from last week. When can I pick them up?',
-      date: '2024-02-12',
-      time: '04:20 PM',
-      status: 'Resolved',
-    },
-    {
-      id: 4,
-      name: 'Sneha Reddy',
-      email: 'sneha.reddy@email.com',
-      phone: '+91 98765 43213',
-      subject: 'Emergency Consultation',
-      message: 'I am experiencing severe abdominal pain. Do you have emergency consultation available?',
-      date: '2024-02-13',
-      time: '11:45 AM',
-      status: 'New',
-    },
-    {
-      id: 5,
-      name: 'Vikram Singh',
-      email: 'vikram.s@email.com',
-      phone: '+91 98765 43214',
-      subject: 'Treatment Cost',
-      message: 'What is the estimated cost for endoscopy procedure? Do you accept insurance?',
-      date: '2024-02-12',
-      time: '02:30 PM',
-      status: 'In Progress',
-    },
-    {
-      id: 6,
-      name: 'Kavita Desai',
-      email: 'kavita.d@email.com',
-      phone: '+91 98765 43215',
-      subject: 'Follow-up Appointment',
-      message: 'I had surgery last month and need to schedule a follow-up appointment.',
-      date: '2024-02-11',
-      time: '03:00 PM',
-      status: 'Resolved',
-    },
-  ]);
+  const [inquiriesList, setInquiriesList] = useState([]);
+
+  const normalizeInquiry = (item) => {
+    const dateValue = item.date || item.createdAt || item.updatedAt || '';
+    const parsed = dateValue ? new Date(dateValue) : null;
+    const isValidDate = parsed && !Number.isNaN(parsed.getTime());
+
+    return {
+      id: item.id || item._id,
+      name: item.name || item.fullName || 'Unknown',
+      email: item.email || '',
+      phone: item.phone || item.mobile || '',
+      subject: item.subject || item.inquiryType || 'General Inquiry',
+      message: item.message || item.description || '',
+      date: isValidDate ? parsed.toISOString().slice(0, 10) : '',
+      time: isValidDate
+        ? parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : '',
+      status: item.status || 'New',
+    };
+  };
+
+  const fetchInquiries = async () => {
+    setIsLoading(true);
+    setErrorMessage('');
+    try {
+      const { data } = await axios.get(API_URL);
+      const list = Array.isArray(data)
+        ? data
+        : data?.inquiries || data?.data || data?.items || data?.results || [];
+      setInquiriesList(list.map(normalizeInquiry));
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || error.message || 'Unable to load inquiries');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInquiries();
+  }, []);
 
   const handleViewInquiry = (inquiry) => {
     setSelectedInquiry(inquiry);
     setShowViewModal(true);
+  };
+
+  const handleReplyOpen = () => {
+    if (!selectedInquiry) return;
+    setReplyError('');
+    setReplyForm({
+      subject: `Re: ${selectedInquiry.subject || 'Inquiry'}`,
+      message: `Hi ${selectedInquiry.name || ''},\n\nThank you for reaching out.\n\n`,
+    });
+    setShowReplyModal(true);
+  };
+
+  const handleReplySend = () => {
+    if (!selectedInquiry?.email) {
+      setReplyError('Recipient email is missing for this inquiry.');
+      return;
+    }
+
+    const subject = replyForm.subject.trim();
+    const message = replyForm.message.trim();
+
+    if (!subject) {
+      setReplyError('Subject is required.');
+      return;
+    }
+
+    if (!message) {
+      setReplyError('Message is required.');
+      return;
+    }
+
+    const mailtoUrl = `mailto:${encodeURIComponent(selectedInquiry.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
+    window.location.href = mailtoUrl;
+    setShowReplyModal(false);
   };
 
   const handleDeleteClick = (inquiry) => {
@@ -93,10 +112,17 @@ const Inquiries = () => {
     setShowDeleteModal(true);
   };
 
-  const handleDeleteConfirm = () => {
-    setInquiriesList(inquiriesList.filter((inq) => inq.id !== inquiryToDelete.id));
-    setShowDeleteModal(false);
-    setInquiryToDelete(null);
+  const handleDeleteConfirm = async () => {
+    if (!inquiryToDelete?.id) return;
+    setErrorMessage('');
+    try {
+      await axios.delete(`${API_URL}/${inquiryToDelete.id}`);
+      await fetchInquiries();
+      setShowDeleteModal(false);
+      setInquiryToDelete(null);
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || error.message || 'Unable to delete inquiry');
+    }
   };
 
   const filteredInquiries = inquiriesList.filter((inquiry) => {
@@ -123,7 +149,6 @@ const Inquiries = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -135,7 +160,6 @@ const Inquiries = () => {
         </div>
       </motion.div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Total', value: inquiriesList.length, color: 'bg-primary-500' },
@@ -159,7 +183,6 @@ const Inquiries = () => {
         ))}
       </div>
 
-      {/* Search and Filter */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -188,8 +211,17 @@ const Inquiries = () => {
         </div>
       </motion.div>
 
-      {/* Inquiries List */}
       <Card delay={0.5}>
+        {errorMessage && (
+          <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 border border-red-200">
+            {errorMessage}
+          </div>
+        )}
+        {isLoading && (
+          <div className="mb-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-700 border border-blue-200">
+            Loading inquiries...
+          </div>
+        )}
         <div className="space-y-4">
           {filteredInquiries.map((inquiry, index) => (
             <motion.div
@@ -241,7 +273,7 @@ const Inquiries = () => {
           ))}
         </div>
 
-        {filteredInquiries.length === 0 && (
+        {!isLoading && filteredInquiries.length === 0 && (
           <div className="text-center py-12">
             <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-800 mb-2">No inquiries found</h3>
@@ -250,7 +282,6 @@ const Inquiries = () => {
         )}
       </Card>
 
-      {/* View Inquiry Modal */}
       {showViewModal && selectedInquiry && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <motion.div
@@ -323,7 +354,7 @@ const Inquiries = () => {
               </div>
 
               <div className="flex gap-3">
-                <Button variant="primary" className="flex-1">
+                <Button variant="primary" className="flex-1" onClick={handleReplyOpen}>
                   Reply
                 </Button>
                 <Button variant="outline" onClick={() => setShowViewModal(false)}>
@@ -335,34 +366,80 @@ const Inquiries = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteModal && inquiryToDelete && (
+      {showReplyModal && selectedInquiry && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-2xl max-w-md w-full"
+            className="bg-white rounded-2xl max-w-2xl w-full"
           >
-            <div className="p-6">
-              <div className="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full mb-4">
-                <Trash2 className="w-6 h-6 text-red-600" />
+            <div className="p-6 border-b border-gray-100">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-gray-800">Reply to Inquiry</h2>
+                <button
+                  onClick={() => setShowReplyModal(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-              <h3 className="text-xl font-bold text-gray-800 text-center mb-2">Delete Inquiry</h3>
-              <p className="text-gray-600 text-center mb-6">
-                Are you sure you want to delete the inquiry from <strong>{inquiryToDelete.name}</strong>? This action cannot be undone.
-              </p>
-              <div className="flex gap-3">
-                <Button variant="outline" onClick={() => setShowDeleteModal(false)} className="flex-1">
-                  Cancel
+              <p className="text-sm text-gray-600 mt-1">To: {selectedInquiry.email}</p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {replyError && (
+                <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 border border-red-200">
+                  {replyError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Subject</label>
+                <input
+                  type="text"
+                  value={replyForm.subject}
+                  onChange={(e) => setReplyForm({ ...replyForm, subject: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="Enter email subject"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Message</label>
+                <textarea
+                  rows="8"
+                  value={replyForm.message}
+                  onChange={(e) => setReplyForm({ ...replyForm, message: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="Write your reply"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button variant="primary" className="flex-1" onClick={handleReplySend}>
+                  Send via Email
                 </Button>
-                <Button variant="danger" onClick={handleDeleteConfirm} className="flex-1">
-                  Delete
+                <Button variant="outline" onClick={() => setShowReplyModal(false)}>
+                  Cancel
                 </Button>
               </div>
             </div>
           </motion.div>
         </div>
       )}
+
+      <DeleteConfirmation
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setInquiryToDelete(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Inquiry"
+        message={`Are you sure you want to delete the inquiry${inquiryToDelete?.name ? ` from ${inquiryToDelete.name}` : ''}? This action cannot be undone.`}
+      />
     </div>
   );
 };

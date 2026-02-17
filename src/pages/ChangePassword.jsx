@@ -1,36 +1,117 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, Eye, EyeOff } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { motion } from 'framer-motion';
+import { API_URLS } from '../config/api';
 
 const ChangePassword = () => {
+  const API_URL = API_URLS.CHANGE_PASSWORD;
+  const savedUserRaw = localStorage.getItem('user');
+  let savedUserEmail = '';
+  try {
+    savedUserEmail = savedUserRaw ? JSON.parse(savedUserRaw)?.email || '' : '';
+  } catch {
+    savedUserEmail = '';
+  }
+
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    currentPassword: '',
+    email: savedUserEmail,
+    oldPassword: '',
     newPassword: '',
-    confirmPassword: '',
   });
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
     setSuccessMessage('');
 
-    if (formData.newPassword !== formData.confirmPassword) {
-      setErrorMessage('New password and confirm password do not match.');
+    const email = formData.email.trim();
+    const oldPassword = formData.oldPassword.trim();
+    const newPassword = formData.newPassword.trim();
+
+    if (!email || !oldPassword || !newPassword) {
+      setErrorMessage('All fields are required.');
       return;
     }
 
-    setSuccessMessage('Password changed successfully.');
-    setFormData({
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: '',
-    });
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(email)) {
+      setErrorMessage('Please enter a valid email address.');
+      return;
+    }
+
+    if (oldPassword.length < 6) {
+      setErrorMessage('Old password must be at least 6 characters.');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setErrorMessage('New password must be at least 6 characters.');
+      return;
+    }
+
+    if (newPassword === oldPassword) {
+      setErrorMessage('New password must be different from old password.');
+      return;
+    }
+
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      setErrorMessage('Session expired. Please login again.');
+      navigate('/login');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const headers = {
+        Authorization: `Bearer ${token}`,
+      };
+
+      const payload = {
+        email,
+        oldPassword,
+        newPassword,
+      };
+
+      const response = await axios.post(API_URL, payload, { headers });
+      const responseData = response.data;
+
+      const explicitlyFailed =
+        responseData?.success === false ||
+        responseData?.status === false ||
+        responseData?.status === 'fail' ||
+        responseData?.ok === false;
+
+      if (explicitlyFailed) {
+        throw new Error(responseData?.message || responseData?.error || 'Unable to change password.');
+      }
+
+      setSuccessMessage('Password changed successfully.');
+      setFormData({
+        email,
+        oldPassword: '',
+        newPassword: '',
+      });
+    } catch (error) {
+      setErrorMessage(
+        error.response?.data?.message ||
+          error.response?.data?.error ||
+          error.message ||
+          'Unable to change password.'
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -66,40 +147,62 @@ const ChangePassword = () => {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
             <input
-              type="password"
-              value={formData.currentPassword}
-              onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
+              type="text"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               required
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Old Password</label>
+            <div className="relative">
+              <input
+                type={showOldPassword ? 'text' : 'password'}
+                value={formData.oldPassword}
+                onChange={(e) => setFormData({ ...formData, oldPassword: e.target.value })}
+                className="w-full px-4 pr-12 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowOldPassword((prev) => !prev)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                aria-label={showOldPassword ? 'Hide old password' : 'Show old password'}
+              >
+                {showOldPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
-            <input
-              type="password"
-              value={formData.newPassword}
-              onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
-            <input
-              type="password"
-              value={formData.confirmPassword}
-              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              required
-            />
+            <div className="relative">
+              <input
+                type={showNewPassword ? 'text' : 'password'}
+                value={formData.newPassword}
+                onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
+                className="w-full px-4 pr-12 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPassword((prev) => !prev)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                aria-label={showNewPassword ? 'Hide new password' : 'Show new password'}
+              >
+                {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
 
           <div className="flex gap-3 pt-2">
-            <Button type="submit" icon={Save}>Save Password</Button>
+            <Button type="submit" icon={Save} disabled={isSaving}>
+              {isSaving ? 'Saving...' : 'Save Password'}
+            </Button>
             <Button type="button" variant="secondary" onClick={() => navigate('/')}>
               Cancel
             </Button>

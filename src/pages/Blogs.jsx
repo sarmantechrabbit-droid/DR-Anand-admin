@@ -1,27 +1,31 @@
 
-
-
-
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Plus, Edit, Trash2, Eye } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
+import DeleteConfirmation from '../components/ui/DeleteConfirmation';
 import { motion } from 'framer-motion';
+import { API_BASE, API_URLS } from '../config/api';
 
 const Blogs = () => {
+  const API_URL = API_URLS.BLOGS;
   const [showViewModal, setShowViewModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedBlog, setSelectedBlog] = useState(null);
   const [blogToDelete, setBlogToDelete] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [addFormError, setAddFormError] = useState('');
   const [addForm, setAddForm] = useState({
     title: '',
     excerpt: '',
     content: '',
     status: 'Draft',
-    image: null,
+    imageFile: null,
+    imagePreview: null,
   });
   const [editForm, setEditForm] = useState({
     id: null,
@@ -29,48 +33,84 @@ const Blogs = () => {
     excerpt: '',
     content: '',
     status: 'Draft',
-    image: null,
+    imageFile: null,
+    imagePreview: null,
   });
 
-  const [blogs, setBlogs] = useState([
-    {
-      id: 1,
-      title: 'Understanding Gastroesophageal Reflux Disease (GERD)',
-      excerpt: 'Learn about the causes, symptoms, and treatment options for GERD.',
-      content: 'GERD is a common digestive disorder that affects millions of people worldwide...',
-      author: 'Dr. Anand Kumar',
-      date: '2024-02-10',
-      views: 1245,
-      status: 'Published',
-      image: null,
-    },
-    {
-      id: 2,
-      title: '5 Tips for Maintaining a Healthy Digestive System',
-      excerpt: 'Discover practical tips and lifestyle changes to improve your digestive health.',
-      content: 'A healthy digestive system is crucial for overall wellbeing...',
-      author: 'Dr. Anand Kumar',
-      date: '2024-02-08',
-      views: 892,
-      status: 'Published',
-      image: null,
-    },
-    {
-      id: 3,
-      title: 'When to See a Gastroenterologist',
-      excerpt: 'Know the warning signs that indicate you should consult a gastroenterology specialist.',
-      content: 'Many people wonder when they should see a gastroenterologist...',
-      author: 'Dr. Anand Kumar',
-      date: '2024-02-05',
-      views: 567,
-      status: 'Draft',
-      image: null,
-    },
-  ]);
+  const [blogs, setBlogs] = useState([]);
 
-  const handleViewBlog = (blog) => {
-    setSelectedBlog(blog);
-    setShowViewModal(true);
+  const resolveImageUrl = (value) => {
+    if (!value) return null;
+    if (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('data:')) {
+      return value;
+    }
+    return `${API_BASE}/uploads/${value}`;
+  };
+
+  const normalizeBlog = (blog) => ({
+    id: blog.id || blog._id,
+    title: blog.title || '',
+    excerpt: blog.excerpt || '',
+    content: blog.content || '',
+    author: blog.author || 'Dr. Anand Kumar',
+    date: (blog.date || blog.createdAt || '').toString().slice(0, 10),
+    views: blog.views || 0,
+    status: blog.status || 'Draft',
+    image: resolveImageUrl(blog.image),
+  });
+
+  const extractBlogsList = (payload) => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.blogs)) return payload.blogs;
+    if (Array.isArray(payload?.data)) return payload.data;
+    if (Array.isArray(payload?.data?.blogs)) return payload.data.blogs;
+    if (Array.isArray(payload?.items)) return payload.items;
+    if (Array.isArray(payload?.results)) return payload.results;
+    return [];
+  };
+
+  const fetchBlogs = async () => {
+    setIsLoading(true);
+    setErrorMessage('');
+    try {
+      const response = await fetch(API_URL);
+      if (!response.ok) {
+        throw new Error('Failed to fetch blogs');
+      }
+      const data = await response.json();
+      if (data?.success === false) {
+        throw new Error(data?.message || 'Unable to load blogs');
+      }
+      const list = extractBlogsList(data);
+      setBlogs(list.map(normalizeBlog));
+    } catch (error) {
+      setErrorMessage(error.message || 'Unable to load blogs');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBlogs();
+  }, []);
+
+  const handleViewBlog = async (blog) => {
+    setErrorMessage('');
+    try {
+      const response = await fetch(`${API_URL}/${blog.id}`);
+      if (!response.ok) {
+        throw new Error('Failed to load blog details');
+      }
+      const data = await response.json();
+      if (data?.success === false) {
+        throw new Error(data?.message || 'Unable to open blog');
+      }
+      const item = data.blog || data;
+      setSelectedBlog(normalizeBlog(item));
+      setShowViewModal(true);
+    } catch (error) {
+      setErrorMessage(error.message || 'Unable to open blog');
+    }
   };
 
   const handleDeleteClick = (blog) => {
@@ -78,64 +118,133 @@ const Blogs = () => {
     setShowDeleteModal(true);
   };
 
-  const handleDeleteConfirm = () => {
-    setBlogs(blogs.filter(b => b.id !== blogToDelete.id));
-    setShowDeleteModal(false);
-    setBlogToDelete(null);
-  };
-
-  const fileToDataUrl = (file, onLoad) => {
-    const reader = new FileReader();
-    reader.onload = () => onLoad(reader.result);
-    reader.readAsDataURL(file);
+  const handleDeleteConfirm = async () => {
+    if (!blogToDelete) return;
+    setErrorMessage('');
+    try {
+      const response = await fetch(`${API_URL}/${blogToDelete.id}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to delete blog');
+      }
+      const data = await response.json().catch(() => null);
+      if (data?.success === false) {
+        throw new Error(data?.message || 'Unable to delete blog');
+      }
+      await fetchBlogs();
+      setShowDeleteModal(false);
+      setBlogToDelete(null);
+    } catch (error) {
+      setErrorMessage(error.message || 'Unable to delete blog');
+    }
   };
 
   const handleAddImageChange = (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-    fileToDataUrl(file, (imageData) => {
-      setAddForm((prev) => ({ ...prev, image: imageData }));
-    });
+    setAddFormError('');
+    setAddForm((prev) => ({
+      ...prev,
+      imageFile: file,
+      imagePreview: URL.createObjectURL(file),
+    }));
   };
 
   const handleEditImageChange = (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-    fileToDataUrl(file, (imageData) => {
-      setEditForm((prev) => ({ ...prev, image: imageData }));
-    });
+    setEditForm((prev) => ({
+      ...prev,
+      imageFile: file,
+      imagePreview: URL.createObjectURL(file),
+    }));
   };
 
-  const handleAddSave = () => {
+  const handleAddSave = async () => {
     const title = addForm.title.trim();
     const excerpt = addForm.excerpt.trim();
     const content = addForm.content.trim();
-    if (!title || !excerpt || !content) {
+    const status = addForm.status;
+
+    setAddFormError('');
+
+    if (!addForm.imageFile) {
+      setAddFormError('Blog image is required.');
       return;
     }
 
-    const nextId = blogs.length ? Math.max(...blogs.map((b) => b.id)) + 1 : 1;
-    const newBlog = {
-      id: nextId,
-      title,
-      excerpt,
-      content,
-      author: 'Dr. Anand Kumar',
-      date: new Date().toISOString().slice(0, 10),
-      views: 0,
-      status: addForm.status,
-      image: addForm.image,
-    };
+    if (!title) {
+      setAddFormError('Title is required.');
+      return;
+    }
 
-    setBlogs([newBlog, ...blogs]);
-    setShowAddModal(false);
-    setAddForm({
-      title: '',
-      excerpt: '',
-      content: '',
-      status: 'Draft',
-      image: null,
-    });
+    if (title.length < 5) {
+      setAddFormError('Title must be at least 5 characters.');
+      return;
+    }
+
+    if (!excerpt) {
+      setAddFormError('Excerpt is required.');
+      return;
+    }
+
+    if (excerpt.length < 15) {
+      setAddFormError('Excerpt must be at least 15 characters.');
+      return;
+    }
+
+    if (!content) {
+      setAddFormError('Content is required.');
+      return;
+    }
+
+    if (content.length < 50) {
+      setAddFormError('Content must be at least 50 characters.');
+      return;
+    }
+
+    if (!['Draft', 'Published'].includes(status)) {
+      setAddFormError('Please select a valid status.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('title', title);
+    formData.append('excerpt', excerpt);
+    formData.append('content', content);
+    formData.append('author', 'Dr. Anand Kumar');
+    formData.append('status', status);
+    if (addForm.imageFile) {
+      formData.append('image', addForm.imageFile);
+    }
+    setErrorMessage('');
+    try {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!response.ok) {
+        throw new Error('Failed to add blog');
+      }
+      const data = await response.json().catch(() => null);
+      if (data?.success === false) {
+        throw new Error(data?.message || 'Unable to add blog');
+      }
+      await fetchBlogs();
+      setShowAddModal(false);
+      setAddFormError('');
+      setAddForm({
+        title: '',
+        excerpt: '',
+        content: '',
+        status: 'Draft',
+        imageFile: null,
+        imagePreview: null,
+      });
+    } catch (error) {
+      setErrorMessage(error.message || 'Unable to add blog');
+    }
   };
 
   const handleEditClick = (blog) => {
@@ -145,37 +254,49 @@ const Blogs = () => {
       excerpt: blog.excerpt,
       content: blog.content,
       status: blog.status,
-      image: blog.image || null,
+      imageFile: null,
+      imagePreview: blog.image || null,
     });
     setShowEditModal(true);
   };
 
-  const handleEditSave = () => {
-    setBlogs(blogs.map((blog) => (
-      blog.id === editForm.id
-        ? {
-            ...blog,
-            title: editForm.title,
-            excerpt: editForm.excerpt,
-            content: editForm.content,
-            status: editForm.status,
-            image: editForm.image,
+  const handleEditSave = async () => {
+    if (!editForm.id) return;
+    setErrorMessage('');
+    try {
+      const response = await fetch(`${API_URL}/${editForm.id}`, {
+        method: 'PUT',
+        body: (() => {
+          const formData = new FormData();
+          formData.append('title', editForm.title);
+          formData.append('excerpt', editForm.excerpt);
+          formData.append('content', editForm.content);
+          formData.append('status', editForm.status);
+          if (editForm.imageFile) {
+            formData.append('image', editForm.imageFile);
           }
-        : blog
-    )));
-
-    if (selectedBlog && selectedBlog.id === editForm.id) {
-      setSelectedBlog({
-        ...selectedBlog,
-        title: editForm.title,
-        excerpt: editForm.excerpt,
-        content: editForm.content,
-        status: editForm.status,
-        image: editForm.image,
+          return formData;
+        })(),
       });
+      if (!response.ok) {
+        throw new Error('Failed to update blog');
+      }
+      const data = await response.json().catch(() => null);
+      if (data?.success === false) {
+        throw new Error(data?.message || 'Unable to update blog');
+      }
+      await fetchBlogs();
+      if (selectedBlog && selectedBlog.id === editForm.id) {
+        const detailResponse = await fetch(`${API_URL}/${editForm.id}`);
+        if (detailResponse.ok) {
+          const detailData = await detailResponse.json();
+          setSelectedBlog(normalizeBlog(detailData.blog || detailData));
+        }
+      }
+      setShowEditModal(false);
+    } catch (error) {
+      setErrorMessage(error.message || 'Unable to update blog');
     }
-
-    setShowEditModal(false);
   };
 
   return (
@@ -189,10 +310,23 @@ const Blogs = () => {
           <h1 className="text-2xl font-bold text-gray-800">Blogs</h1>
           <p className="text-gray-600 mt-1">Manage your blog posts</p>
         </div>
-        <Button icon={Plus} onClick={() => setShowAddModal(true)}>Add New Blog</Button>
+        <Button icon={Plus} onClick={() => {
+          setAddFormError('');
+          setShowAddModal(true);
+        }}>Add New Blog</Button>
       </motion.div>
 
       <Card delay={0.1}>
+        {errorMessage && (
+          <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 border border-red-200">
+            {errorMessage}
+          </div>
+        )}
+        {isLoading && (
+          <div className="mb-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-700 border border-blue-200">
+            Loading blogs...
+          </div>
+        )}
         <div className="space-y-4">
           {blogs.map((blog, index) => (
             <motion.div
@@ -243,10 +377,14 @@ const Blogs = () => {
               </div>
             </motion.div>
           ))}
+          {!isLoading && blogs.length === 0 && (
+            <div className="text-center py-10 text-gray-500">
+              No blogs found.
+            </div>
+          )}
         </div>
       </Card>
 
-      {/* View Blog Modal */}
       {showViewModal && selectedBlog && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <motion.div
@@ -329,7 +467,6 @@ const Blogs = () => {
         </div>
       )}
 
-      {/* Add Blog Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <motion.div
@@ -352,16 +489,22 @@ const Blogs = () => {
             </div>
 
             <div className="p-6 space-y-4">
+              {addFormError && (
+                <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 border border-red-200">
+                  {addFormError}
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Image</label>
                 <input
                   type="file"
                   accept="image/*"
                   onChange={handleAddImageChange}
+                  required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
-                {addForm.image && (
-                  <img src={addForm.image} alt="Blog preview" className="mt-3 w-full h-48 object-cover rounded-lg" />
+                {addForm.imagePreview && (
+                  <img src={addForm.imagePreview} alt="Blog preview" className="mt-3 w-full h-48 object-cover rounded-lg" />
                 )}
               </div>
 
@@ -370,8 +513,12 @@ const Blogs = () => {
                 <input
                   type="text"
                   value={addForm.title}
-                  onChange={(e) => setAddForm({ ...addForm, title: e.target.value })}
+                  onChange={(e) => {
+                    setAddFormError('');
+                    setAddForm({ ...addForm, title: e.target.value });
+                  }}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  required
                 />
               </div>
 
@@ -380,8 +527,12 @@ const Blogs = () => {
                 <input
                   type="text"
                   value={addForm.excerpt}
-                  onChange={(e) => setAddForm({ ...addForm, excerpt: e.target.value })}
+                  onChange={(e) => {
+                    setAddFormError('');
+                    setAddForm({ ...addForm, excerpt: e.target.value });
+                  }}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  required
                 />
               </div>
 
@@ -390,8 +541,12 @@ const Blogs = () => {
                 <textarea
                   rows="6"
                   value={addForm.content}
-                  onChange={(e) => setAddForm({ ...addForm, content: e.target.value })}
+                  onChange={(e) => {
+                    setAddFormError('');
+                    setAddForm({ ...addForm, content: e.target.value });
+                  }}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  required
                 />
               </div>
 
@@ -399,7 +554,10 @@ const Blogs = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
                 <select
                   value={addForm.status}
-                  onChange={(e) => setAddForm({ ...addForm, status: e.target.value })}
+                  onChange={(e) => {
+                    setAddFormError('');
+                    setAddForm({ ...addForm, status: e.target.value });
+                  }}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
                   <option>Draft</option>
@@ -420,7 +578,6 @@ const Blogs = () => {
         </div>
       )}
 
-      {/* Edit Blog Modal */}
       {showEditModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <motion.div
@@ -451,8 +608,8 @@ const Blogs = () => {
                   onChange={handleEditImageChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
-                {editForm.image && (
-                  <img src={editForm.image} alt="Blog preview" className="mt-3 w-full h-48 object-cover rounded-lg" />
+                {editForm.imagePreview && (
+                  <img src={editForm.imagePreview} alt="Blog preview" className="mt-3 w-full h-48 object-cover rounded-lg" />
                 )}
               </div>
 
@@ -511,34 +668,16 @@ const Blogs = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteModal && blogToDelete && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-2xl max-w-md w-full"
-          >
-            <div className="p-6">
-              <div className="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full mb-4">
-                <Trash2 className="w-6 h-6 text-red-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-800 text-center mb-2">Delete Blog Post</h3>
-              <p className="text-gray-600 text-center mb-6">
-                Are you sure you want to delete <strong>{blogToDelete.title}</strong>? This action cannot be undone.
-              </p>
-              <div className="flex gap-3">
-                <Button variant="outline" onClick={() => setShowDeleteModal(false)} className="flex-1">
-                  Cancel
-                </Button>
-                <Button variant="danger" onClick={handleDeleteConfirm} className="flex-1">
-                  Delete
-                </Button>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      )}
+      <DeleteConfirmation
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setBlogToDelete(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Blog Post"
+        message={`Are you sure you want to delete ${blogToDelete?.title ? `"${blogToDelete.title}"` : 'this blog'}? This action cannot be undone.`}
+      />
     </div>
   );
 };

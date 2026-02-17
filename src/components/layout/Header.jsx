@@ -7,8 +7,11 @@ import { useAuth } from '../../context/AuthContext';
 const Header = ({ toggleSidebar }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const displayName = user?.name || 'Admin';
+  const displayEmail = user?.email || 'admin@hospital.com';
+  const displayRole = user?.role || 'Admin';
 
   const handleLogout = () => {
     logout();
@@ -100,8 +103,8 @@ const Header = ({ toggleSidebar }) => {
                 <User className="w-5 h-5 text-white" />
               </div>
               <div className="hidden sm:block text-left">
-                <p className="text-sm font-medium text-gray-800">Dr. Anand</p>
-                <p className="text-xs text-gray-500">Gastro Surgeon</p>
+                <p className="text-sm font-medium text-gray-800">{displayName}</p>
+                <p className="text-xs text-gray-500">{displayRole}</p>
               </div>
               <ChevronDown className="w-4 h-4 text-gray-400 hidden sm:block" />
             </button>
@@ -115,8 +118,8 @@ const Header = ({ toggleSidebar }) => {
                   className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden"
                 >
                   <div className="p-4 border-b border-gray-100">
-                    <p className="font-medium text-gray-800">Dr. Anand Kumar</p>
-                    <p className="text-sm text-gray-500">anand@hospital.com</p>
+                    <p className="font-medium text-gray-800">{displayName}</p>
+                    <p className="text-sm text-gray-500">{displayEmail}</p>
                   </div>
                   <div className="py-2">
                     <button
