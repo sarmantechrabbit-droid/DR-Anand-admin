@@ -293,15 +293,15 @@ const Inquiries = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
-              className="p-5 border border-gray-100 rounded-xl hover:border-primary-200 hover:bg-primary-50 transition-all cursor-pointer"
+              className="p-5 border border-gray-100 rounded-xl hover:border-primary-200 hover:bg-primary-50 transition-all cursor-pointer overflow-hidden"
               onClick={() => setSelectedInquiry(inquiry)}
             >
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h4 className="font-semibold text-gray-800 text-lg">{inquiry.name}</h4>
-                      <p className="text-sm text-gray-600 mt-1">{inquiry.subject}</p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between mb-3 gap-3">
+                    <div className="min-w-0">
+                      <h4 className="font-semibold text-gray-800 text-lg break-words">{inquiry.name}</h4>
+                      <p className="text-sm text-gray-600 mt-1 break-words">{inquiry.subject}</p>
                     </div>
                     <Badge status={getStatusVariant(inquiry.status)}>{inquiry.status}</Badge>
                   </div>
@@ -309,11 +309,11 @@ const Inquiries = () => {
                   <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-3">
                     <div className="flex items-center gap-1">
                       <Mail className="w-4 h-4" />
-                      <span>{inquiry.email}</span>
+                      <span className="break-all">{inquiry.email}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Phone className="w-4 h-4" />
-                      <span>{inquiry.phone}</span>
+                      <span className="break-all">{inquiry.phone}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
@@ -321,7 +321,7 @@ const Inquiries = () => {
                     </div>
                   </div>
 
-                  <p className="text-gray-700 line-clamp-2">{inquiry.message}</p>
+                  <p className="text-gray-700 line-clamp-2 break-words">{inquiry.message}</p>
                 </div>
 
                 <div className="flex items-center gap-2 lg:flex-col">
@@ -385,10 +385,10 @@ const Inquiries = () => {
             </div>
 
             <div className="p-6 space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-800">{selectedInquiry.name}</h3>
-                  <p className="text-sm text-gray-600 mt-1">{selectedInquiry.subject}</p>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="text-xl font-semibold text-gray-800 break-words">{selectedInquiry.name}</h3>
+                  <p className="text-sm text-gray-600 mt-1 break-words">{selectedInquiry.subject}</p>
                 </div>
                 <Badge status={getStatusVariant(selectedInquiry.status)}>{selectedInquiry.status}</Badge>
               </div>
@@ -398,7 +398,7 @@ const Inquiries = () => {
                   <Mail className="w-5 h-5 text-gray-400" />
                   <div>
                     <p className="text-xs text-gray-500">Email</p>
-                    <p className="text-sm font-medium text-gray-800">{selectedInquiry.email}</p>
+                    <p className="text-sm font-medium text-gray-800 break-all">{selectedInquiry.email}</p>
                   </div>
                 </div>
 
@@ -406,7 +406,7 @@ const Inquiries = () => {
                   <Phone className="w-5 h-5 text-gray-400" />
                   <div>
                     <p className="text-xs text-gray-500">Phone</p>
-                    <p className="text-sm font-medium text-gray-800">{selectedInquiry.phone}</p>
+                    <p className="text-sm font-medium text-gray-800 break-all">{selectedInquiry.phone}</p>
                   </div>
                 </div>
 
@@ -414,7 +414,7 @@ const Inquiries = () => {
                   <Calendar className="w-5 h-5 text-gray-400" />
                   <div>
                     <p className="text-xs text-gray-500">Date</p>
-                    <p className="text-sm font-medium text-gray-800">{selectedInquiry.date}</p>
+                    <p className="text-sm font-medium text-gray-800 break-words">{selectedInquiry.date}</p>
                   </div>
                 </div>
 
@@ -422,7 +422,7 @@ const Inquiries = () => {
                   <Clock className="w-5 h-5 text-gray-400" />
                   <div>
                     <p className="text-xs text-gray-500">Time</p>
-                    <p className="text-sm font-medium text-gray-800">{selectedInquiry.time}</p>
+                    <p className="text-sm font-medium text-gray-800 break-words">{selectedInquiry.time}</p>
                   </div>
                 </div>
               </div>
@@ -430,7 +430,7 @@ const Inquiries = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Message</label>
                 <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-gray-700 leading-relaxed">{selectedInquiry.message}</p>
+                  <p className="text-gray-700 leading-relaxed whitespace-pre-wrap break-words">{selectedInquiry.message}</p>
                 </div>
               </div>
 
