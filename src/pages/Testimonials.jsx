@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import {
   Star,
-  ThumbsUp,
   MessageSquare,
   Eye,
   Trash2,
@@ -110,7 +109,6 @@ const Testimonials = () => {
     date: (item.date || item.createdAt || "").toString().slice(0, 10),
     status: normalizeStatus(item.status),
     comment: item.comment || item.review || item.message || "",
-    likes: Number(item.likes) || 0,
     image: resolveImageUrl(item.image || item.avatar || item.photo),
     youtubeLink: item.youtubeLink || item.videoUrl || "",
   });
@@ -373,12 +371,6 @@ const Testimonials = () => {
       icon: Eye,
       color: "bg-green-500",
     },
-    {
-      label: "Total Likes",
-      value: testimonials.reduce((sum, t) => sum + (Number(t.likes) || 0), 0),
-      icon: ThumbsUp,
-      color: "bg-purple-500",
-    },
   ];
 
   return (
@@ -417,7 +409,7 @@ const Testimonials = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         {stats.map((stat, index) => (
           <motion.div
             key={index}
@@ -538,11 +530,7 @@ const Testimonials = () => {
                   {testimonial.comment}
                 </p>
 
-                <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <ThumbsUp className="w-4 h-4" />
-                    <span className="text-sm">{testimonial.likes} likes</span>
-                  </div>
+                <div className="flex items-center justify-end pt-4 border-t border-gray-100">
                   <div className="flex items-center gap-2">
                     {testimonial.status === TESTIMONIAL_STATUS.PENDING && (
                       <Button
@@ -843,10 +831,6 @@ const Testimonials = () => {
                     <p className="text-gray-700 leading-relaxed">
                       {viewItem.comment}
                     </p>
-                  </div>
-                  <div className="flex items-center gap-2 text-gray-600 pt-4 border-t border-gray-100">
-                    <ThumbsUp className="w-5 h-5" />
-                    <span>{viewItem.likes} likes</span>
                   </div>
                 </div>
               </div>
