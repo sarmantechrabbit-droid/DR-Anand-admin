@@ -19,6 +19,7 @@ const Inquiries = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [inquiryToDelete, setInquiryToDelete] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [updatingStatusId, setUpdatingStatusId] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [replyError, setReplyError] = useState('');
   const [replyForm, setReplyForm] = useState({
@@ -84,8 +85,15 @@ const Inquiries = () => {
   };
 
   const handleReplySend = () => {
-    if (!selectedInquiry?.email) {
+    const recipientEmail = (selectedInquiry?.email || '').trim();
+    if (!recipientEmail) {
       setReplyError('Recipient email is missing for this inquiry.');
+      return;
+    }
+
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(recipientEmail)) {
+      setReplyError('Recipient email is invalid for this inquiry.');
       return;
     }
 
@@ -102,14 +110,70 @@ const Inquiries = () => {
       return;
     }
 
-    const mailtoUrl = `mailto:${encodeURIComponent(selectedInquiry.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
-    window.location.href = mailtoUrl;
+    // Keep recipient unencoded for wider mail client compatibility.
+    const mailtoUrl = `mailto:${recipientEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
+
+    try {
+      window.location.assign(mailtoUrl);
+    } catch {
+      const anchor = document.createElement('a');
+      anchor.href = mailtoUrl;
+      anchor.style.display = 'none';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+    }
+
     setShowReplyModal(false);
   };
 
   const handleDeleteClick = (inquiry) => {
     setInquiryToDelete(inquiry);
     setShowDeleteModal(true);
+  };
+
+  const updateInquiryStatusById = async (id, status) => {
+    const payload = { status };
+    try {
+      await axios.put(`${API_URL}/${id}/status`, payload);
+      return;
+    } catch {
+      // Fallback for APIs that update status directly on the inquiry endpoint.
+    }
+
+    try {
+      await axios.patch(`${API_URL}/${id}/status`, payload);
+      return;
+    } catch {
+      // Fallback for APIs that only support full resource updates.
+    }
+
+    try {
+      await axios.put(`${API_URL}/${id}`, payload);
+    } catch {
+      await axios.patch(`${API_URL}/${id}`, payload);
+    }
+  };
+
+  const handleStatusUpdate = async (inquiry, nextStatus) => {
+    if (!inquiry?.id || inquiry.status === nextStatus) return;
+
+    setErrorMessage('');
+    setUpdatingStatusId(inquiry.id);
+    try {
+      await updateInquiryStatusById(inquiry.id, nextStatus);
+
+      setInquiriesList((prev) =>
+        prev.map((item) => (item.id === inquiry.id ? { ...item, status: nextStatus } : item))
+      );
+      setSelectedInquiry((prev) =>
+        prev && prev.id === inquiry.id ? { ...prev, status: nextStatus } : prev
+      );
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || error.message || 'Unable to update inquiry status');
+    } finally {
+      setUpdatingStatusId(null);
+    }
   };
 
   const handleDeleteConfirm = async () => {
@@ -261,10 +325,27 @@ const Inquiries = () => {
                 </div>
 
                 <div className="flex items-center gap-2 lg:flex-col">
-                  <Button size="sm" variant="outline" icon={Eye} onClick={() => handleViewInquiry(inquiry)}>
+                
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    icon={Eye}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleViewInquiry(inquiry);
+                    }}
+                  >
                     View
                   </Button>
-                  <Button size="sm" variant="danger" icon={Trash2} onClick={() => handleDeleteClick(inquiry)}>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    icon={Trash2}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteClick(inquiry);
+                    }}
+                  >
                     Delete
                   </Button>
                 </div>
@@ -353,14 +434,32 @@ const Inquiries = () => {
                 </div>
               </div>
 
-              <div className="flex gap-3">
-                <Button variant="primary" className="flex-1" onClick={handleReplyOpen}>
-                  Reply
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button
+                  variant="secondary"
+                  disabled={
+                    updatingStatusId === selectedInquiry.id ||
+                    selectedInquiry.status === 'In Progress' ||
+                    selectedInquiry.status === 'Resolved'
+                  }
+                  onClick={() => handleStatusUpdate(selectedInquiry, 'In Progress')}
+                >
+                  {updatingStatusId === selectedInquiry.id &&
+                  selectedInquiry.status !== 'In Progress' &&
+                  selectedInquiry.status !== 'Resolved'
+                    ? 'Updating...'
+                    : 'Mark as In Progress'}
                 </Button>
-                <Button variant="outline" onClick={() => setShowViewModal(false)}>
-                  Close
+                <Button
+                  disabled={updatingStatusId === selectedInquiry.id || selectedInquiry.status === 'Resolved'}
+                  onClick={() => handleStatusUpdate(selectedInquiry, 'Resolved')}
+                >
+                  {updatingStatusId === selectedInquiry.id && selectedInquiry.status !== 'Resolved'
+                    ? 'Updating...'
+                    : 'Mark as Resolved'}
                 </Button>
               </div>
+
             </div>
           </motion.div>
         </div>

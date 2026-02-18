@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, Menu, User, LogOut, KeyRound, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -9,6 +9,7 @@ const Header = ({ toggleSidebar }) => {
   const [showProfile, setShowProfile] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const profileDropdownRef = useRef(null);
   const displayName = user?.name || 'Admin';
   const displayEmail = user?.email || 'admin@hospital.com';
   const displayRole = user?.role || 'Admin';
@@ -23,6 +24,29 @@ const Header = ({ toggleSidebar }) => {
     { id: 2, text: 'Patient report uploaded successfully', time: '1 hour ago', unread: true },
     { id: 3, text: 'Upcoming surgery reminder', time: '2 hours ago', unread: false },
   ];
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target)) {
+        setShowProfile(false);
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setShowProfile(false);
+        setShowNotifications(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
@@ -45,7 +69,7 @@ const Header = ({ toggleSidebar }) => {
         <div className="flex items-center gap-2 sm:gap-4">
           {/* Notifications */}
           <div className="relative">
-            <button
+            {/* <button
               onClick={() => {
                 setShowNotifications(!showNotifications);
                 setShowProfile(false);
@@ -54,7 +78,7 @@ const Header = ({ toggleSidebar }) => {
             >
               <Bell className="w-6 h-6 text-gray-600" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
+            </button> */}
 
             <AnimatePresence>
               {showNotifications && (
@@ -91,7 +115,7 @@ const Header = ({ toggleSidebar }) => {
           </div>
 
           {/* Profile Dropdown */}
-          <div className="relative">
+          <div ref={profileDropdownRef} className="relative">
             <button
               onClick={() => {
                 setShowProfile(!showProfile);
@@ -123,7 +147,10 @@ const Header = ({ toggleSidebar }) => {
                   </div>
                   <div className="py-2">
                     <button
-                      onClick={() => navigate('/change-password')}
+                      onClick={() => {
+                        setShowProfile(false);
+                        navigate('/change-password');
+                      }}
                       className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
                     >
                       <KeyRound className="w-4 h-4" />

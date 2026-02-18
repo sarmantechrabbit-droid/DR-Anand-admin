@@ -19,8 +19,17 @@ import { motion, AnimatePresence } from "framer-motion";
 import { API_BASE, API_URLS } from "../config/api";
 
 const API_URL = API_URLS.TESTIMONIALS;
+const TESTIMONIAL_STATUS = {
+  PENDING: "Pending",
+  PUBLISHED: "Published",
+};
 
 const Testimonials = () => {
+  const TESTIMONIAL_LIMITS = {
+    patientMin: 3,
+    patientMax: 50,
+    commentMax: 500,
+  };
   const [filter, setFilter] = useState("All");
   const [showPopup, setShowPopup] = useState(false);
   const [showDeletePopup, setShowDeletePopup] = useState(false);
@@ -36,12 +45,28 @@ const Testimonials = () => {
     patient: "",
     rating: 5,
     comment: "",
-    status: "Pending",
+    status: TESTIMONIAL_STATUS.PENDING,
     imageFile: null,
     imagePreview: null,
     youtubeLink: "",
   });
   const [formError, setFormError] = useState("");
+
+  const normalizeStatus = (value) => {
+    const normalized = String(value || "").trim().toLowerCase();
+    if (["published", "approve", "approved", "active"].includes(normalized)) {
+      return TESTIMONIAL_STATUS.PUBLISHED;
+    }
+    return TESTIMONIAL_STATUS.PENDING;
+  };
+
+  const toApiStatus = (value) =>
+    normalizeStatus(value) === TESTIMONIAL_STATUS.PUBLISHED
+      ? TESTIMONIAL_STATUS.PUBLISHED
+      : TESTIMONIAL_STATUS.PENDING;
+
+  const toIsPublished = (value) => normalizeStatus(value) === TESTIMONIAL_STATUS.PUBLISHED;
+  const toFormBoolean = (value) => (value ? "true" : "");
 
   const resolveImageUrl = (value) => {
     if (!value) return null;
@@ -56,10 +81,26 @@ const Testimonials = () => {
   };
 
   const normalizeYoutubeLink = (value) => {
+    return (value || "").trim();
+  };
+
+  const isValidYoutubeWatchUrl = (value) => {
     const raw = (value || "").trim();
-    if (!raw) return "";
-    if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
-    return `https://${raw}`;
+    if (!raw) return true;
+
+    try {
+      const parsed = new URL(raw);
+      if (parsed.protocol !== "https:") return false;
+      if (parsed.hostname !== "www.youtube.com") return false;
+      if (parsed.pathname !== "/watch") return false;
+
+      const videoId = parsed.searchParams.get("v");
+      if (!videoId) return false;
+
+      return /^[A-Za-z0-9_-]{11}$/.test(videoId);
+    } catch {
+      return false;
+    }
   };
 
   const normalizeTestimonial = (item) => ({
@@ -67,7 +108,7 @@ const Testimonials = () => {
     patient: item.patient || item.name || "",
     rating: Number(item.rating) || 5,
     date: (item.date || item.createdAt || "").toString().slice(0, 10),
-    status: item.status || "Pending",
+    status: normalizeStatus(item.status),
     comment: item.comment || item.review || item.message || "",
     likes: Number(item.likes) || 0,
     image: resolveImageUrl(item.image || item.avatar || item.photo),
@@ -109,7 +150,7 @@ const Testimonials = () => {
       patient: "",
       rating: 5,
       comment: "",
-      status: "Pending",
+      status: TESTIMONIAL_STATUS.PENDING,
       imageFile: null,
       imagePreview: null,
       youtubeLink: "",
@@ -132,8 +173,17 @@ const Testimonials = () => {
       return;
     }
 
-    if (patient.length < 2) {
-      setFormError("Patient name must be at least 2 characters.");
+    if (patient.length < TESTIMONIAL_LIMITS.patientMin) {
+      setFormError(
+        `Patient name must be at least ${TESTIMONIAL_LIMITS.patientMin} characters.`,
+      );
+      return;
+    }
+
+    if (patient.length > TESTIMONIAL_LIMITS.patientMax) {
+      setFormError(
+        `Patient name cannot be more than ${TESTIMONIAL_LIMITS.patientMax} characters.`,
+      );
       return;
     }
 
@@ -144,6 +194,13 @@ const Testimonials = () => {
 
     if (comment.length < 10) {
       setFormError("Comment must be at least 10 characters.");
+      return;
+    }
+
+    if (comment.length > TESTIMONIAL_LIMITS.commentMax) {
+      setFormError(
+        `Comment cannot be more than ${TESTIMONIAL_LIMITS.commentMax} characters.`,
+      );
       return;
     }
 
@@ -158,17 +215,11 @@ const Testimonials = () => {
     }
 
     const normalizedYoutubeLink = normalizeYoutubeLink(formData.youtubeLink);
-    if (normalizedYoutubeLink) {
-      try {
-        const parsed = new URL(normalizedYoutubeLink);
-        if (!parsed.hostname) {
-          setFormError("Please enter a valid YouTube URL.");
-          return;
-        }
-      } catch {
-        setFormError("Please enter a valid YouTube URL.");
-        return;
-      }
+    if (!isValidYoutubeWatchUrl(normalizedYoutubeLink)) {
+      setFormError(
+        "Invalid YouTube URL. Use this format: https://www.youtube.com/watch?v=VIDEO_ID",
+      );
+      return;
     }
 
     setIsSaving(true);
@@ -177,7 +228,9 @@ const Testimonials = () => {
         patient,
         rating,
         comment,
-        status: formData.status,
+        status: normalizeStatus(formData.status),
+        apiStatus: toApiStatus(formData.status),
+        isPublished: toIsPublished(formData.status),
         youtubeLink: normalizedYoutubeLink,
         imageFile: formData.imageFile,
       };
@@ -187,7 +240,10 @@ const Testimonials = () => {
         body.append("patient", payload.patient);
         body.append("rating", String(payload.rating));
         body.append("comment", payload.comment);
-        body.append("status", payload.status);
+        body.append("status", payload.apiStatus);
+        body.append("isPublished", toFormBoolean(payload.isPublished));
+        body.append("published", toFormBoolean(payload.isPublished));
+        body.append("approved", toFormBoolean(payload.isPublished));
         if (payload.youtubeLink) {
           body.append("youtubeLink", payload.youtubeLink);
         }
@@ -234,7 +290,7 @@ const Testimonials = () => {
       patient: item.patient,
       rating: item.rating,
       comment: item.comment,
-      status: item.status,
+      status: normalizeStatus(item.status),
       imageFile: null,
       imagePreview: item.image || null,
       youtubeLink: item.youtubeLink || "",
@@ -272,7 +328,12 @@ const Testimonials = () => {
   const handlePublish = async (id) => {
     setErrorMessage("");
     try {
-      await updateTestimonialById(id, () => ({ status: "Published" }));
+      await updateTestimonialById(id, () => ({
+        status: TESTIMONIAL_STATUS.PUBLISHED,
+        isPublished: true,
+        published: true,
+        approved: true,
+      }));
       await fetchTestimonials();
     } catch (error) {
       setErrorMessage(
@@ -452,7 +513,7 @@ const Testimonials = () => {
                   </div>
                   <Badge
                     status={
-                      testimonial.status === "Published"
+                      testimonial.status === TESTIMONIAL_STATUS.PUBLISHED
                         ? "Confirmed"
                         : "Pending"
                     }
@@ -483,7 +544,7 @@ const Testimonials = () => {
                     <span className="text-sm">{testimonial.likes} likes</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    {testimonial.status === "Pending" && (
+                    {testimonial.status === TESTIMONIAL_STATUS.PENDING && (
                       <Button
                         size="sm"
                         onClick={() => handlePublish(testimonial.id)}
@@ -592,6 +653,7 @@ const Testimonials = () => {
                       onChange={(e) =>
                         setFormData({ ...formData, patient: e.target.value })
                       }
+                      maxLength={TESTIMONIAL_LIMITS.patientMax}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                       required
                     />
@@ -627,6 +689,7 @@ const Testimonials = () => {
                         setFormData({ ...formData, comment: e.target.value })
                       }
                       rows="4"
+                      maxLength={TESTIMONIAL_LIMITS.commentMax}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                       required
                     />
@@ -642,8 +705,8 @@ const Testimonials = () => {
                       }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     >
-                      <option>Pending</option>
-                      <option>Published</option>
+                      <option>{TESTIMONIAL_STATUS.PENDING}</option>
+                      <option>{TESTIMONIAL_STATUS.PUBLISHED}</option>
                     </select>
                   </div>
                   <div>
@@ -768,7 +831,7 @@ const Testimonials = () => {
                   <div>
                     <Badge
                       status={
-                        viewItem.status === "Published"
+                        viewItem.status === TESTIMONIAL_STATUS.PUBLISHED
                           ? "Confirmed"
                           : "Pending"
                       }

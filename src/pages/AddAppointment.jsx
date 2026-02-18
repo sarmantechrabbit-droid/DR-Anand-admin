@@ -1,26 +1,42 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save } from 'lucide-react';
+import axios from 'axios';
+import { ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { API_URLS } from '../config/api';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { motion } from 'framer-motion';
 
 const AddAppointment = () => {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    patient: '',
-    date: '',
-    time: '',
-    type: 'Consultation',
-    duration: '30 min',
-    reason: '',
-    notes: '',
+    firstName: '',
+    lastName: '',
+    mobile: '',
+    city: '',
+    appointmentDate: '',
+    appointmentTime: '',
+    treatmentType: 'Consultation',
+    fees: '',
     status: 'Pending',
+    notes: ''
   });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    navigate('/appointments');
+    setLoading(true);
+    try {
+      const response = await axios.post(API_URLS.APPOINTMENTS, formData);
+      if (response.data.success) {
+        navigate('/appointments');
+      }
+    } catch (err) {
+      console.error('Error saving appointment:', err);
+      alert('Failed to save appointment. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -47,12 +63,12 @@ const AddAppointment = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Patient Name
+                First Name
               </label>
               <input
                 type="text"
-                value={formData.patient}
-                onChange={(e) => setFormData({ ...formData, patient: e.target.value })}
+                value={formData.firstName}
+                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 required
               />
@@ -60,12 +76,51 @@ const AddAppointment = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Date
+                Last Name
+              </label>
+              <input
+                type="text"
+                value={formData.lastName}
+                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Mobile Number
+              </label>
+              <input
+                type="tel"
+                value={formData.mobile}
+                onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                City
+              </label>
+              <input
+                type="text"
+                value={formData.city}
+                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Appointment Date
               </label>
               <input
                 type="date"
-                value={formData.date}
-                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                value={formData.appointmentDate}
+                onChange={(e) => setFormData({ ...formData, appointmentDate: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 required
               />
@@ -73,12 +128,12 @@ const AddAppointment = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Time
+                Appointment Time
               </label>
               <input
                 type="time"
-                value={formData.time}
-                onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                value={formData.appointmentTime}
+                onChange={(e) => setFormData({ ...formData, appointmentTime: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 required
               />
@@ -86,11 +141,11 @@ const AddAppointment = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Type
+                Treatment Type
               </label>
               <select
-                value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                value={formData.treatmentType}
+                onChange={(e) => setFormData({ ...formData, treatmentType: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option>Consultation</option>
@@ -102,19 +157,15 @@ const AddAppointment = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Duration
+                Fees (₹)
               </label>
-              <select
-                value={formData.duration}
-                onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+              <input
+                type="number"
+                value={formData.fees}
+                onChange={(e) => setFormData({ ...formData, fees: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                <option>15 min</option>
-                <option>30 min</option>
-                <option>45 min</option>
-                <option>60 min</option>
-                <option>90 min</option>
-              </select>
+                required
+              />
             </div>
 
             <div>
@@ -129,20 +180,8 @@ const AddAppointment = () => {
                 <option>Pending</option>
                 <option>Confirmed</option>
                 <option>Cancelled</option>
+                <option>Completed</option>
               </select>
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Reason for Visit
-              </label>
-              <input
-                type="text"
-                value={formData.reason}
-                onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                required
-              />
             </div>
 
             <div className="md:col-span-2">
@@ -159,8 +198,10 @@ const AddAppointment = () => {
           </div>
 
           <div className="flex gap-3">
-            <Button type="submit" icon={Save}>Save Appointment</Button>
-            <Button type="button" variant="secondary" onClick={() => navigate('/appointments')}>
+            <Button type="submit" icon={loading ? Loader2 : Save} disabled={loading}>
+              {loading ? 'Saving...' : 'Save Appointment'}
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => navigate('/appointments')} disabled={loading}>
               Cancel
             </Button>
           </div>

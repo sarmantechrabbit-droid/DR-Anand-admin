@@ -28,72 +28,73 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     const value = email.trim();
-    if (!value || !password) {
+    const pass = password.trim();
+
+    if (!value || !pass) {
       return { success: false, error: 'Email and password are required.' };
     }
 
-    const payloadCandidates = [
-      { email: value, password },
-      { username: value, password },
-      { adminEmail: value, password },
-    ];
+    // Send a single payload so backend validation errors aren't overwritten by fallback attempts.
+    const payload = {
+      email: value,
+      password: pass,
+      username: value,
+      adminEmail: value,
+    };
 
-    let lastError = 'Invalid credentials';
+    try {
+      const { data } = await axios.post(LOGIN_API_URL, payload);
 
-    for (const payload of payloadCandidates) {
-      try {
-        const { data } = await axios.post(LOGIN_API_URL, payload);
+      const explicitlyFailed =
+        data?.success === false ||
+        data?.status === false ||
+        data?.status === 'fail' ||
+        data?.ok === false;
+      if (explicitlyFailed) {
+        throw new Error(data?.message || data?.error || 'Invalid credentials');
+      }
 
-        const explicitlyFailed =
-          data?.success === false ||
-          data?.status === false ||
-          data?.status === 'fail' ||
-          data?.ok === false;
-        if (explicitlyFailed) {
-          throw new Error(data?.message || data?.error || 'Invalid credentials');
-        }
+      const token =
+        data?.token ||
+        data?.accessToken ||
+        data?.data?.token ||
+        data?.data?.accessToken ||
+        '';
 
-        const token =
-          data?.token ||
-          data?.accessToken ||
-          data?.data?.token ||
-          data?.data?.accessToken ||
-          '';
+      const sourceUser =
+        data?.admin ||
+        data?.user ||
+        data?.data?.admin ||
+        data?.data?.user ||
+        {};
 
-        const sourceUser =
-          data?.admin ||
-          data?.user ||
-          data?.data?.admin ||
-          data?.data?.user ||
-          {};
+      const userData = {
+        id: sourceUser.id || sourceUser._id || 1,
+        name: sourceUser.name || sourceUser.fullName || 'Admin',
+        email: sourceUser.email || value,
+        role: sourceUser.role || 'admin',
+      };
 
-        const userData = {
-          id: sourceUser.id || sourceUser._id || 1,
-          name: sourceUser.name || sourceUser.fullName || 'Admin',
-          email: sourceUser.email || value,
-          role: sourceUser.role || 'admin',
-        };
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
 
-        setUser(userData);
-        localStorage.setItem('user', JSON.stringify(userData));
+      if (token) {
+        localStorage.setItem('authToken', token);
+      } else {
+        localStorage.removeItem('authToken');
+      }
 
-        if (token) {
-          localStorage.setItem('authToken', token);
-        } else {
-          localStorage.removeItem('authToken');
-        }
-
-        return { success: true };
-      } catch (error) {
-        lastError =
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error:
           error.response?.data?.message ||
           error.response?.data?.error ||
           error.message ||
-          'Invalid credentials';
-      }
+          'Invalid credentials',
+      };
     }
-
-    return { success: false, error: lastError };
   };
 
   const logout = () => {

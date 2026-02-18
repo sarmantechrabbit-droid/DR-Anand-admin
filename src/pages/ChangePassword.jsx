@@ -7,6 +7,43 @@ import Button from '../components/ui/Button';
 import { motion } from 'framer-motion';
 import { API_URLS } from '../config/api';
 
+const PASSWORD_RULES = {
+  minLength: 8,
+  maxLength: 20,
+};
+
+const getPasswordValidationError = (password) => {
+  if (password.length < PASSWORD_RULES.minLength) {
+    return `New password must be at least ${PASSWORD_RULES.minLength} characters.`;
+  }
+
+  if (password.length > PASSWORD_RULES.maxLength) {
+    return `New password must be at most ${PASSWORD_RULES.maxLength} characters.`;
+  }
+
+  if (/\s/.test(password)) {
+    return 'New password must not contain spaces.';
+  }
+
+  if (!/[A-Z]/.test(password)) {
+    return 'New password must include at least 1 uppercase letter (A-Z).';
+  }
+
+  if (!/[a-z]/.test(password)) {
+    return 'New password must include at least 1 lowercase letter (a-z).';
+  }
+
+  if (!/[0-9]/.test(password)) {
+    return 'New password must include at least 1 number (0-9).';
+  }
+
+  if (!/[^A-Za-z0-9]/.test(password)) {
+    return 'New password must include at least 1 special character (e.g., @ # $ % & * ! _).';
+  }
+
+  return '';
+};
+
 const ChangePassword = () => {
   const API_URL = API_URLS.CHANGE_PASSWORD;
   const savedUserRaw = localStorage.getItem('user');
@@ -54,8 +91,9 @@ const ChangePassword = () => {
       return;
     }
 
-    if (newPassword.length < 6) {
-      setErrorMessage('New password must be at least 6 characters.');
+    const passwordValidationError = getPasswordValidationError(newPassword);
+    if (passwordValidationError) {
+      setErrorMessage(passwordValidationError);
       return;
     }
 
@@ -197,6 +235,10 @@ const ChangePassword = () => {
                 {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+            <p className="mt-2 text-xs text-gray-500">
+              Use 8-20 characters with at least 1 uppercase letter, 1 lowercase letter, 1 number, 1 special
+              character, and no spaces.
+            </p>
           </div>
 
           <div className="flex gap-3 pt-2">

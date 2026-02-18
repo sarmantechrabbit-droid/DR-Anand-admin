@@ -172,12 +172,12 @@ const Appointments = () => {
                 <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
                   <User className="w-6 h-6 text-primary-500" />
                 </div>
-                <div>
-                  <h4 className="font-semibold text-gray-800">{appointment.patient}</h4>
+                <div className="min-w-0">
+                  <h4 className="font-semibold text-gray-800 break-words [overflow-wrap:anywhere]">{appointment.patient}</h4>
                   <div className="flex flex-wrap items-center gap-2 mt-2 text-sm text-gray-600">
-                    <span className="px-2 py-1 bg-gray-100 rounded text-xs">{appointment.typesOfTreatment}</span>
-                    <span className="text-xs">Mobile: {appointment.mobileNumber}</span>
-                    <span className="text-xs">City: {appointment.city}</span>
+                    <span className="px-2 py-1 bg-gray-100 rounded text-xs break-words [overflow-wrap:anywhere]">{appointment.typesOfTreatment}</span>
+                    <span className="text-xs break-words [overflow-wrap:anywhere]">Mobile: {appointment.mobileNumber}</span>
+                    <span className="text-xs break-words [overflow-wrap:anywhere]">City: {appointment.city}</span>
                   </div>
                 </div>
               </div>
@@ -237,36 +237,36 @@ const Appointments = () => {
 
             <div className="p-6 space-y-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-800">{selectedAppointment.patient}</h3>
-                  <p className="text-sm text-gray-600 mt-1">{selectedAppointment.typesOfTreatment}</p>
+                <div className="min-w-0">
+                  <h3 className="text-xl font-semibold text-gray-800 break-words [overflow-wrap:anywhere]">{selectedAppointment.patient}</h3>
+                  <p className="text-sm text-gray-600 mt-1 break-words [overflow-wrap:anywhere]">{selectedAppointment.typesOfTreatment}</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <p className="text-xs text-gray-500">First Name</p>
-                  <p className="text-sm font-medium text-gray-800">{selectedAppointment.firstName}</p>
+                  <p className="text-sm font-medium text-gray-800 break-words [overflow-wrap:anywhere]">{selectedAppointment.firstName}</p>
                 </div>
 
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <p className="text-xs text-gray-500">Last Name</p>
-                  <p className="text-sm font-medium text-gray-800">{selectedAppointment.lastName}</p>
+                  <p className="text-sm font-medium text-gray-800 break-words [overflow-wrap:anywhere]">{selectedAppointment.lastName}</p>
                 </div>
 
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <p className="text-xs text-gray-500">Mobile Number</p>
-                  <p className="text-sm font-medium text-gray-800">{selectedAppointment.mobileNumber}</p>
+                  <p className="text-sm font-medium text-gray-800 break-words [overflow-wrap:anywhere]">{selectedAppointment.mobileNumber}</p>
                 </div>
 
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <p className="text-xs text-gray-500">Types of Treatment</p>
-                  <p className="text-sm font-medium text-gray-800">{selectedAppointment.typesOfTreatment}</p>
+                  <p className="text-sm font-medium text-gray-800 break-words [overflow-wrap:anywhere]">{selectedAppointment.typesOfTreatment}</p>
                 </div>
 
                 <div className="p-4 bg-gray-50 rounded-lg md:col-span-2">
                   <p className="text-xs text-gray-500">City</p>
-                  <p className="text-sm font-medium text-gray-800">{selectedAppointment.city}</p>
+                  <p className="text-sm font-medium text-gray-800 break-words [overflow-wrap:anywhere]">{selectedAppointment.city}</p>
                 </div>
               </div>
             </div>

@@ -10,6 +10,11 @@ import { API_BASE, API_URLS } from '../config/api';
 
 const Blogs = () => {
   const API_URL = API_URLS.BLOGS;
+  const BLOG_LIMITS = {
+    titleMax: 100,
+    excerptMax: 600,
+    contentMax: 1000,
+  };
   const [showViewModal, setShowViewModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -19,6 +24,7 @@ const Blogs = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [addFormError, setAddFormError] = useState('');
+  const [editFormError, setEditFormError] = useState('');
   const [addForm, setAddForm] = useState({
     title: '',
     excerpt: '',
@@ -39,6 +45,19 @@ const Blogs = () => {
 
   const [blogs, setBlogs] = useState([]);
 
+  const normalizeViews = (blog) => {
+    const value =
+      blog?.views ??
+      blog?.viewCount ??
+      blog?.viewsCount ??
+      blog?.totalViews ??
+      blog?.view ??
+      0;
+
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
   const resolveImageUrl = (value) => {
     if (!value) return null;
     if (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('data:')) {
@@ -54,7 +73,7 @@ const Blogs = () => {
     content: blog.content || '',
     author: blog.author || 'Dr. Anand Kumar',
     date: (blog.date || blog.createdAt || '').toString().slice(0, 10),
-    views: blog.views || 0,
+    views: normalizeViews(blog),
     status: blog.status || 'Draft',
     image: resolveImageUrl(blog.image),
   });
@@ -90,6 +109,61 @@ const Blogs = () => {
     }
   };
 
+  const extractSingleBlog = (payload) => {
+    if (!payload || typeof payload !== 'object') return null;
+    if (payload.blog && typeof payload.blog === 'object') return payload.blog;
+    if (payload.data?.blog && typeof payload.data.blog === 'object') return payload.data.blog;
+    if (payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)) return payload.data;
+    if (payload.result && typeof payload.result === 'object') return payload.result;
+    if (payload.item && typeof payload.item === 'object') return payload.item;
+    return payload;
+  };
+
+  const fetchBlogDetails = async (id) => {
+    const response = await fetch(`${API_URL}/${id}`);
+    if (!response.ok) {
+      throw new Error('Failed to load blog details');
+    }
+    const data = await response.json();
+    if (data?.success === false) {
+      throw new Error(data?.message || 'Unable to open blog');
+    }
+    return extractSingleBlog(data);
+  };
+
+  const incrementBlogViews = async (id) => {
+    const attempts = [
+      { method: 'POST', url: `${API_URL}/${id}/view` },
+      { method: 'POST', url: `${API_URL}/${id}/views` },
+      { method: 'PATCH', url: `${API_URL}/${id}/views`, body: { action: 'increment' } },
+      { method: 'PATCH', url: `${API_URL}/${id}`, body: { incrementViews: true } },
+      { method: 'PUT', url: `${API_URL}/${id}`, body: { incrementViews: true } },
+    ];
+
+    for (const attempt of attempts) {
+      try {
+        const response = await fetch(attempt.url, {
+          method: attempt.method,
+          headers: attempt.body ? { 'Content-Type': 'application/json' } : undefined,
+          body: attempt.body ? JSON.stringify(attempt.body) : undefined,
+        });
+
+        if (!response.ok) continue;
+        const data = await response.json().catch(() => null);
+        if (data?.success === false) continue;
+        const item = extractSingleBlog(data);
+        if (item && typeof item === 'object') {
+          return item;
+        }
+        return null;
+      } catch {
+        // Try next endpoint shape.
+      }
+    }
+
+    return null;
+  };
+
   useEffect(() => {
     fetchBlogs();
   }, []);
@@ -97,16 +171,14 @@ const Blogs = () => {
   const handleViewBlog = async (blog) => {
     setErrorMessage('');
     try {
-      const response = await fetch(`${API_URL}/${blog.id}`);
-      if (!response.ok) {
-        throw new Error('Failed to load blog details');
-      }
-      const data = await response.json();
-      if (data?.success === false) {
-        throw new Error(data?.message || 'Unable to open blog');
-      }
-      const item = data.blog || data;
-      setSelectedBlog(normalizeBlog(item));
+      const incremented = await incrementBlogViews(blog.id);
+      const detailItem = incremented || (await fetchBlogDetails(blog.id));
+      const normalized = normalizeBlog(detailItem);
+
+      setSelectedBlog(normalized);
+      setBlogs((prev) =>
+        prev.map((item) => (item.id === blog.id ? { ...item, views: normalized.views } : item))
+      );
       setShowViewModal(true);
     } catch (error) {
       setErrorMessage(error.message || 'Unable to open blog');
@@ -184,6 +256,11 @@ const Blogs = () => {
       return;
     }
 
+    if (title.length > BLOG_LIMITS.titleMax) {
+      setAddFormError(`Title cannot be more than ${BLOG_LIMITS.titleMax} characters.`);
+      return;
+    }
+
     if (!excerpt) {
       setAddFormError('Excerpt is required.');
       return;
@@ -194,6 +271,11 @@ const Blogs = () => {
       return;
     }
 
+    if (excerpt.length > BLOG_LIMITS.excerptMax) {
+      setAddFormError(`Excerpt cannot be more than ${BLOG_LIMITS.excerptMax} characters.`);
+      return;
+    }
+
     if (!content) {
       setAddFormError('Content is required.');
       return;
@@ -201,6 +283,11 @@ const Blogs = () => {
 
     if (content.length < 50) {
       setAddFormError('Content must be at least 50 characters.');
+      return;
+    }
+
+    if (content.length > BLOG_LIMITS.contentMax) {
+      setAddFormError(`Content cannot be more than ${BLOG_LIMITS.contentMax} characters.`);
       return;
     }
 
@@ -248,6 +335,7 @@ const Blogs = () => {
   };
 
   const handleEditClick = (blog) => {
+    setEditFormError('');
     setEditForm({
       id: blog.id,
       title: blog.title,
@@ -262,16 +350,74 @@ const Blogs = () => {
 
   const handleEditSave = async () => {
     if (!editForm.id) return;
+
+    const title = editForm.title.trim();
+    const excerpt = editForm.excerpt.trim();
+    const content = editForm.content.trim();
+    const status = editForm.status;
+
+    setEditFormError('');
     setErrorMessage('');
+
+    if (!title) {
+      setEditFormError('Title is required.');
+      return;
+    }
+
+    if (title.length < 5) {
+      setEditFormError('Title must be at least 5 characters.');
+      return;
+    }
+
+    if (title.length > BLOG_LIMITS.titleMax) {
+      setEditFormError(`Title cannot be more than ${BLOG_LIMITS.titleMax} characters.`);
+      return;
+    }
+
+    if (!excerpt) {
+      setEditFormError('Excerpt is required.');
+      return;
+    }
+
+    if (excerpt.length < 15) {
+      setEditFormError('Excerpt must be at least 15 characters.');
+      return;
+    }
+
+    if (excerpt.length > BLOG_LIMITS.excerptMax) {
+      setEditFormError(`Excerpt cannot be more than ${BLOG_LIMITS.excerptMax} characters.`);
+      return;
+    }
+
+    if (!content) {
+      setEditFormError('Content is required.');
+      return;
+    }
+
+    if (content.length < 50) {
+      setEditFormError('Content must be at least 50 characters.');
+      return;
+    }
+
+    if (content.length > BLOG_LIMITS.contentMax) {
+      setEditFormError(`Content cannot be more than ${BLOG_LIMITS.contentMax} characters.`);
+      return;
+    }
+
+    if (!['Draft', 'Published'].includes(status)) {
+      setEditFormError('Please select a valid status.');
+      return;
+    }
+
     try {
       const response = await fetch(`${API_URL}/${editForm.id}`, {
         method: 'PUT',
         body: (() => {
           const formData = new FormData();
-          formData.append('title', editForm.title);
-          formData.append('excerpt', editForm.excerpt);
-          formData.append('content', editForm.content);
-          formData.append('status', editForm.status);
+          formData.append('title', title);
+          formData.append('excerpt', excerpt);
+          formData.append('content', content);
+          formData.append('status', status);
           if (editForm.imageFile) {
             formData.append('image', editForm.imageFile);
           }
@@ -517,6 +663,7 @@ const Blogs = () => {
                     setAddFormError('');
                     setAddForm({ ...addForm, title: e.target.value });
                   }}
+                  maxLength={BLOG_LIMITS.titleMax}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   required
                 />
@@ -531,6 +678,7 @@ const Blogs = () => {
                     setAddFormError('');
                     setAddForm({ ...addForm, excerpt: e.target.value });
                   }}
+                  maxLength={BLOG_LIMITS.excerptMax}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   required
                 />
@@ -545,6 +693,7 @@ const Blogs = () => {
                     setAddFormError('');
                     setAddForm({ ...addForm, content: e.target.value });
                   }}
+                  maxLength={BLOG_LIMITS.contentMax}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   required
                 />
@@ -600,6 +749,11 @@ const Blogs = () => {
             </div>
 
             <div className="p-6 space-y-4">
+              {editFormError && (
+                <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 border border-red-200">
+                  {editFormError}
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Image</label>
                 <input
@@ -618,7 +772,11 @@ const Blogs = () => {
                 <input
                   type="text"
                   value={editForm.title}
-                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                  onChange={(e) => {
+                    setEditFormError('');
+                    setEditForm({ ...editForm, title: e.target.value });
+                  }}
+                  maxLength={BLOG_LIMITS.titleMax}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
@@ -628,7 +786,11 @@ const Blogs = () => {
                 <input
                   type="text"
                   value={editForm.excerpt}
-                  onChange={(e) => setEditForm({ ...editForm, excerpt: e.target.value })}
+                  onChange={(e) => {
+                    setEditFormError('');
+                    setEditForm({ ...editForm, excerpt: e.target.value });
+                  }}
+                  maxLength={BLOG_LIMITS.excerptMax}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
@@ -638,7 +800,11 @@ const Blogs = () => {
                 <textarea
                   rows="6"
                   value={editForm.content}
-                  onChange={(e) => setEditForm({ ...editForm, content: e.target.value })}
+                  onChange={(e) => {
+                    setEditFormError('');
+                    setEditForm({ ...editForm, content: e.target.value });
+                  }}
+                  maxLength={BLOG_LIMITS.contentMax}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
@@ -647,7 +813,10 @@ const Blogs = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
                 <select
                   value={editForm.status}
-                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                  onChange={(e) => {
+                    setEditFormError('');
+                    setEditForm({ ...editForm, status: e.target.value });
+                  }}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
                   <option>Draft</option>
