@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Users, Calendar, Activity, MessageSquare, Clock, Plus, Eye, Loader2, RefreshCw } from 'lucide-react';
+import { Users, Calendar, Activity, MessageSquare, Plus, Eye, Loader2, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { API_URLS } from '../config/api';
 import StatsCard from '../components/ui/StatsCard';
 import Card from '../components/ui/Card';
-import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 
 const iconMap = {
@@ -16,6 +15,13 @@ const iconMap = {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const formatDate = (value) => {
+    if (!value) return '-';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '-';
+    return parsed.toLocaleDateString('en-GB');
+  };
+
   const [data, setData] = useState({
     stats: [],
     recentAppointments: [],
@@ -122,9 +128,8 @@ const Dashboard = () => {
                 <thead>
                   <tr className="text-left border-b border-gray-100">
                     <th className="pb-3 text-sm font-semibold text-gray-600">Patient</th>
-                    <th className="pb-3 text-sm font-semibold text-gray-600">Time</th>
+                    <th className="pb-3 text-sm font-semibold text-gray-600">Date</th>
                     <th className="pb-3 text-sm font-semibold text-gray-600">Type</th>
-                    <th className="pb-3 text-sm font-semibold text-gray-600">Status</th>
                     <th className="pb-3 text-sm font-semibold text-gray-600">Action</th>
                   </tr>
                 </thead>
@@ -142,15 +147,9 @@ const Dashboard = () => {
                         </div>
                       </td>
                       <td className="py-4">
-                        <div className="flex items-center gap-1 text-gray-600">
-                          <Clock className="w-4 h-4" />
-                          <span className="text-sm">{appointment.time || '—'}</span>
-                        </div>
+                        <span className="text-sm text-gray-600">{formatDate(appointment.date)}</span>
                       </td>
                       <td className="py-4 text-sm text-gray-600">{appointment.type}</td>
-                      <td className="py-4">
-                        <Badge status={appointment.status} />
-                      </td>
                       <td className="py-4">
                         <Button size="sm" variant="outline" onClick={() => navigate('/appointments')}>
                           View
@@ -224,3 +223,4 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
