@@ -197,9 +197,9 @@ const Dashboard = () => {
                     }`}></div>
                     <div>
                       <p className="text-sm font-medium text-gray-800">{item.label}</p>
-                      <p className="text-xs text-gray-500">{item.time}</p>
+                      {/* <p className="text-xs text-gray-500">{item.date}</p> */}
                     </div>
-                    {item.status && (
+                    {/* {item.status && (
                       <span className={`ml-auto text-xs px-2 py-0.5 rounded-full ${
                         item.status === 'Confirmed' ? 'bg-green-100 text-green-700' :
                         item.status === 'Completed' ? 'bg-blue-100 text-blue-700' :
@@ -208,7 +208,7 @@ const Dashboard = () => {
                       }`}>
                         {item.status}
                       </span>
-                    )}
+                    )} */}
                   </div>
                 ))
               ) : (
