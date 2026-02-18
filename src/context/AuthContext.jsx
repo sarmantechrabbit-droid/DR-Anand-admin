@@ -1,32 +1,111 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 
 import { API_URLS } from '../config/api';
+import { setupAxiosInterceptors } from '../config/axiosInterceptor';
+import { isTokenExpired } from '../utils/jwt';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const LOGIN_API_URL = API_URLS.LOGIN;
+  const VERIFY_TOKEN_URL = API_URLS.VERIFY_TOKEN;
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Restore login session on refresh
-    try {
-      const savedUser = localStorage.getItem('user');
-      if (savedUser) {
-        setUser(JSON.parse(savedUser));
-      }
-    } catch {
-      localStorage.removeItem('user');
-      localStorage.removeItem('authToken');
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
+  const clearAuthStorage = useCallback(() => {
+    localStorage.removeItem('user');
+    localStorage.removeItem('authToken');
   }, []);
 
-  const login = async (email, password) => {
+  const clearAuthState = useCallback(() => {
+    setUser(null);
+    clearAuthStorage();
+  }, [clearAuthStorage]);
+
+  const logout = useCallback(
+    ({ navigate, replace = true } = {}) => {
+      clearAuthState();
+      window.history.replaceState(null, '', '/login');
+      if (navigate) {
+        navigate('/login', { replace });
+      } else if (window.location.pathname !== '/login') {
+        window.location.replace('/login');
+      }
+    },
+    [clearAuthState]
+  );
+
+  const verifyTokenWithBackend = useCallback(async (token) => {
+    const verifyCandidates = [VERIFY_TOKEN_URL, `${API_URLS.DASHBOARD}`];
+
+    for (const url of verifyCandidates) {
+      try {
+        await axios.get(url, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        return true;
+      } catch (error) {
+        const status = error?.response?.status;
+        if (status === 401 || status === 403) {
+          return false;
+        }
+        if (status === 404) {
+          continue;
+        }
+      }
+    }
+
+    return true;
+  }, [VERIFY_TOKEN_URL]);
+
+  useEffect(() => {
+    const bootstrapAuth = async () => {
+      const token = localStorage.getItem('authToken');
+      const savedUser = localStorage.getItem('user');
+
+      if (!token || !savedUser) {
+        clearAuthState();
+        setLoading(false);
+        return;
+      }
+
+      if (isTokenExpired(token)) {
+        clearAuthState();
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        const isValidOnServer = await verifyTokenWithBackend(token);
+        if (!isValidOnServer) {
+          clearAuthState();
+        } else {
+          setUser(parsedUser);
+        }
+      } catch {
+        clearAuthState();
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    bootstrapAuth();
+  }, [clearAuthState, verifyTokenWithBackend]);
+
+  useEffect(() => {
+    return setupAxiosInterceptors({
+      onUnauthorized: () => {
+        clearAuthState();
+        if (window.location.pathname !== '/login') {
+          window.location.replace('/login');
+        }
+      },
+    });
+  }, [clearAuthState]);
+
+  const login = useCallback(async (email, password) => {
     const value = email.trim();
     const pass = password.trim();
 
@@ -34,7 +113,6 @@ export const AuthProvider = ({ children }) => {
       return { success: false, error: 'Email and password are required.' };
     }
 
-    // Send a single payload so backend validation errors aren't overwritten by fallback attempts.
     const payload = {
       email: value,
       password: pass,
@@ -61,6 +139,11 @@ export const AuthProvider = ({ children }) => {
         data?.data?.accessToken ||
         '';
 
+      if (!token || isTokenExpired(token)) {
+        clearAuthState();
+        return { success: false, error: 'Received invalid or expired token.' };
+      }
+
       const sourceUser =
         data?.admin ||
         data?.user ||
@@ -77,12 +160,7 @@ export const AuthProvider = ({ children }) => {
 
       setUser(userData);
       localStorage.setItem('user', JSON.stringify(userData));
-
-      if (token) {
-        localStorage.setItem('authToken', token);
-      } else {
-        localStorage.removeItem('authToken');
-      }
+      localStorage.setItem('authToken', token);
 
       return { success: true };
     } catch (error) {
@@ -95,16 +173,18 @@ export const AuthProvider = ({ children }) => {
           'Invalid credentials',
       };
     }
-  };
+  }, [LOGIN_API_URL, clearAuthState]);
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('authToken');
-  };
+  const value = useMemo(() => ({
+    user,
+    login,
+    logout,
+    loading,
+    isAuthenticated: Boolean(user && localStorage.getItem('authToken')),
+  }), [user, login, logout, loading]);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

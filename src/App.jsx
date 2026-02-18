@@ -18,8 +18,8 @@ import AddAppointment from './pages/AddAppointment';
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
+    <Router>
+      <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route
@@ -43,8 +43,8 @@ function App() {
             <Route path="change-password" element={<ChangePassword />} />
           </Route>
         </Routes>
-      </Router>
-    </AuthProvider>
+      </AuthProvider>
+    </Router>
   );
 }
 

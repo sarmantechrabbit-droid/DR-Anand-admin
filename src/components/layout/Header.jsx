@@ -15,8 +15,8 @@ const Header = ({ toggleSidebar }) => {
   const displayRole = user?.role || 'Admin';
 
   const handleLogout = () => {
-    logout();
-    navigate('/login');
+    setShowProfile(false);
+    logout({ navigate, replace: true });
   };
 
   const notifications = [

@@ -9,5 +9,6 @@ export const API_URLS = {
   APPOINTMENTS: `${API_BASE}/api/appointments`,
   LOGIN: `${API_BASE}/api/admin/login`,
   CHANGE_PASSWORD: `${API_BASE}/api/admin/change-password`,
+  VERIFY_TOKEN: import.meta.env.VITE_AUTH_VERIFY_URL || `${API_BASE}/api/admin/verify-token`,
   DASHBOARD: `${API_BASE}/api/dashboard/stats`,
 };

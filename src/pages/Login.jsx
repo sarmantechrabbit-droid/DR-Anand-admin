@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, Stethoscope, AlertCircle, Eye, EyeOff, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { isTokenExpired } from '../utils/jwt';
 import { API_URLS } from '../config/api';
 
 const Login = () => {
@@ -24,8 +25,15 @@ const Login = () => {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [showForgotOldPassword, setShowForgotOldPassword] = useState(false);
   const [showForgotNewPassword, setShowForgotNewPassword] = useState(false);
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const token = localStorage.getItem('authToken');
+    if (user && token && !isTokenExpired(token)) {
+      navigate('/', { replace: true });
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -35,7 +43,7 @@ const Login = () => {
     const result = await login(email, password);
 
     if (result.success) {
-      navigate('/');
+      navigate('/', { replace: true });
     } else {
       setError(result.error);
     }
@@ -207,7 +215,7 @@ const Login = () => {
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
-
+{/* 
           <div className="mt-6 text-center">
             <button
               type="button"
@@ -216,7 +224,7 @@ const Login = () => {
             >
               Forgot password?
             </button>
-          </div>
+          </div> */}
         </div>
 
         {/* Demo Credentials */}
